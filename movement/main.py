@@ -1,74 +1,66 @@
 from pico2d import *
 
-open_canvas(1280, 720)
+WINDOW_W, WINDOW_H = 1280, 720
+CENTER_X, CENTER_Y = WINDOW_W // 2, 220
+SCALE = 4.0
 
+open_canvas(WINDOW_W, WINDOW_H)
 
-img_run = load_image('run.png')
-img_attack = load_image('attack.png')
-img_jump_attack = load_image('jump_attack.png')
-img_spin_attack = load_image('spin_attack.png')
-img_damage = load_image('damage.png')
+img_idle       = load_image('idle.png')
+img_cas_idle   = load_image('casual_idle.png')
+img_run        = load_image('run.png')
+img_cas_walk   = load_image('casual_walk.png')
 
-data_run = dict (
-    lefts=[15, 112, 204, 291, 377, 472, 561, 648],
-    widths=[84, 79, 74, 72, 81, 75, 73, 75]
+data_idle = dict(
+    lefts  =[8,45,84,123,162,202,242,282,321,360],
+    widths =[31,31,32,32,33,33,33,32,32,31]
 )
-data_attack = dict (
-    lefts  =[16,81,179,310,403,488,572,657,772,886],
-    widths =[64,89,122,85,82,63,73,107,105,90]
+data_casual_idle = dict(
+    lefts  =[12,45,78,111,144,178,213,248,283,319,353],
+    widths =[26,26,26,26,27,28,28,28,28,26,26]
 )
-data_jump_attack = dict (
-    lefts=[9, 82, 163, 244, 308, 381, 466, 518, 571, 623, 678, 733, 788, 839],
-    widths =[62,70,68,53,63,62,43,43,43,45,46,45,42,63]
+data_run = dict(
+    lefts  =[5,44,84,130,178,222,265,308,351,394,438,481,526,572],
+    widths =[32,33,39,40,37,36,36,36,36,37,36,38,39,39]
 )
-data_spin_attack = dict(
-    lefts  =[14,99,196,288,385,488,578,641,740,832,923,1006,1120,1215,1311,1406,1501,1596],
-    widths =[75,85,80,85,91,78,51,87,80,83,74,106,87,85,86,86,87,87]
-)
-data_damage = dict(
-    lefts  =[16,115,201,288,392,561,664,763,843],
-    widths =[79,67,84,91,152,90,90,79,76]
+data_casual_walk = dict(
+    lefts  =[11,46,80,116,153,186,220,254],
+    widths =[28,28,29,30,26,27,27,28]
 )
 
-CenterX, CenterY = 640, 110
-SCALE = 5.0
-frame_gap = 0.06
-
-def play_animation(img, data, CenterX, CenterY, repeat=5, frame_gap=0.06, SCALE=5.0):
-    lefts = data['lefts']
-    widths = data['widths']
-
-    aw = sum(widths) / len(widths)
+def play_center(img, data, loops=3, frame_gap=0.08, scale=SCALE):
+    lefts, widths = data['lefts'], data['widths']
     h = img.h
-
-    for _ in range(repeat):
+    aw = sum(widths) / len(widths)
+    for _ in range(loops):
         for l, w in zip(lefts, widths):
-            dw = int(w * SCALE)
-            dh = int(h * SCALE)
-            x = CenterX
-            y = int(CenterY + dh / 2)
-
-            x_offset = int(((w- aw) / 2) * SCALE)
-            x += x_offset
-
+            dw, dh = int(w * scale), int(h * scale)
+            x = CENTER_X + int(((w - aw) / 2) * scale)
+            y = CENTER_Y + dh // 2
             clear_canvas()
-            img.clip_composite_draw(l, 0, w, h, 0, '', x, y, dw, dh)
+            img.clip_draw(l, 0, w, h, x, y, dw, dh)
             update_canvas()
             delay(frame_gap)
 
-try:
-    actions = [
-        (img_run,    data_run,    frame_gap),
-        (img_attack, data_attack, frame_gap),
-        (img_jump_attack, data_jump_attack, frame_gap),
-        (img_spin_attack, data_spin_attack, frame_gap),
-        (img_damage, data_damage, frame_gap + 0.03)
-    ]
-    while True:
-        for img, meta, FG in actions:
-            play_animation(img, meta, CenterX, CenterY, repeat=5, frame_gap = FG, SCALE=SCALE)
-            delay(1.0)
-except KeyboardInterrupt:
-    pass
-finally:
-    close_canvas()
+def play_lr(img, data, step_px=14, frame_gap=0.05, scale=SCALE):
+    lefts, widths = data['lefts'], data['widths']
+    h = img.h
+    aw = sum(widths) / len(widths)
+    i = 0
+    for x in range(-200, WINDOW_W + 200, step_px):
+        w = widths[i]; l = lefts[i]
+        dw, dh = int(w * scale), int(h * scale)
+        xx = x + int(((w - aw) / 2) * scale)
+        yy = CENTER_Y + dh // 2
+        clear_canvas()
+        img.clip_draw(l, 0, w, h, xx, yy, dw, dh)
+        update_canvas()
+        i = (i + 1) % len(widths)
+        delay(frame_gap)
+
+play_center(img_idle, data_idle, loops=3, frame_gap=0.08)
+play_center(img_cas_idle, data_casual_idle, loops=3, frame_gap=0.08)
+play_lr(img_run, data_run, step_px=16, frame_gap=0.04)
+play_lr(img_cas_walk, data_casual_walk, step_px=10, frame_gap=0.055)
+
+close_canvas()
