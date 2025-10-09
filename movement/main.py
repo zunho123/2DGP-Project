@@ -2,32 +2,35 @@ from pico2d import *
 import time
 
 WINDOW_W, WINDOW_H = 1280, 720
-CENTER_X, CENTER_Y = WINDOW_W // 2, 220
-SCALE = 4.0
-RUN_SPEED_PPS = 300.0
+RUN_SPEED_PPS = 260.0
+ZOOM = 1.6
+CHAR_SCALE = 1.6
 
 open_canvas(WINDOW_W, WINDOW_H)
 
-img_idle     = load_image('idle.png')
-img_run      = load_image('run.png')
+bg = load_image('ClubNeon1.png')
+img_idle = load_image('idle.png')
+img_run  = load_image('run.png')
 
 data_idle = dict(
     lefts  =[8,45,84,123,162,202,242,282,321,360],
     widths =[31,31,32,32,33,33,33,32,32,31]
 )
 data_run = dict(
-    lefts  =[11, 55, 98, 141, 184, 227, 271, 314, 359, 405],
-    widths =[39, 38, 38, 38, 38, 39, 38, 40, 41, 41]
+    lefts  =[11,55,98,141,184,227,271,314,359,405],
+    widths =[39,38,38,38,38,39,38,40,41,41]
 )
+data_idle['aw'] = sum(data_idle['widths']) / len(data_idle['widths'])
+data_run['aw']  = sum(data_run['widths'])  / len(data_run['widths'])
 
-def prep(d):
-    d['aw'] = sum(d['widths']) / len(d['widths'])
-prep(data_idle); prep(data_run)
+bg_w, bg_h = bg.w, bg.h
+GROUND_Y = 48
 
 IDLE, RUN = 0, 1
 state = IDLE
 dir = 1
-x = CENTER_X
+xw = bg_w // 2
+yw = GROUND_Y
 frame = 0
 tacc = 0.0
 left_pressed = False
@@ -35,16 +38,35 @@ right_pressed = False
 running = True
 last = time.time()
 
-def draw_frame(img, data, fi, x, y, scale, flip=False):
+def clamp(a, lo, hi):
+    return max(lo, min(hi, a))
+
+def camera_view(x_center, zoom):
+    vw = WINDOW_W / zoom
+    vh = WINDOW_H / zoom
+    left = clamp(x_center - vw / 2, 0, max(0, bg_w - vw))
+    bottom = clamp(0, 0, max(0, bg_h - vh))
+    return left, bottom, vw, vh
+
+def draw_world_bg(left, bottom, vw, vh):
+    bg.clip_draw(int(left), int(bottom), int(vw), int(vh), WINDOW_W // 2, WINDOW_H // 2, WINDOW_W, WINDOW_H)
+
+def draw_world_sprite(img, data, fi, x, y, flip, left, bottom, vw, vh):
+    sx = WINDOW_W / vw
+    sy = WINDOW_H / vh
     w = data['widths'][fi]
     l = data['lefts'][fi]
     h = img.h
-    dx = x + int(((w - data['aw']) / 2) * scale)
-    dw, dh = int(w * scale), int(h * scale)
+    dw = int(w * CHAR_SCALE * sx)
+    dh = int(h * CHAR_SCALE * sy)
+    cx = (x + ((w - data['aw']) / 2)) - left
+    cy = (y) - bottom
+    sxp = int(cx * sx)
+    syp = int(cy * sy) + dh // 2
     if flip:
-        img.clip_composite_draw(l, 0, w, h, 0, 'h', dx, y + dh // 2, dw, dh)
+        img.clip_composite_draw(l, 0, w, h, 0, 'h', sxp, syp, dw, dh)
     else:
-        img.clip_draw(l, 0, w, h, dx, y + dh // 2, dw, dh)
+        img.clip_draw(l, 0, w, h, sxp, syp, dw, dh)
 
 while running:
     now = time.time()
@@ -74,8 +96,8 @@ while running:
         state = IDLE
 
     if state == RUN:
-        x += dir * RUN_SPEED_PPS * dt
-        x = max(40, min(WINDOW_W - 40, x))
+        xw += dir * RUN_SPEED_PPS * dt
+        xw = clamp(xw, 20, bg_w - 20)
 
     gap = 0.08 if state == IDLE else 0.04
     maxf = len(data_idle['widths']) if state == IDLE else len(data_run['widths'])
@@ -84,11 +106,14 @@ while running:
         frame = (frame + 1) % maxf
         tacc -= gap
 
+    left, bottom, vw, vh = camera_view(xw, ZOOM)
+
     clear_canvas()
+    draw_world_bg(left, bottom, vw, vh)
     if state == IDLE:
-        draw_frame(img_idle, data_idle, frame, x, CENTER_Y, SCALE, flip=(dir == -1))
+        draw_world_sprite(img_idle, data_idle, frame, xw, yw, (dir == -1), left, bottom, vw, vh)
     else:
-        draw_frame(img_run, data_run, frame, x, CENTER_Y, SCALE, flip=(dir == -1))
+        draw_world_sprite(img_run, data_run, frame, xw, yw, (dir == -1), left, bottom, vw, vh)
     update_canvas()
     delay(0.001)
 
