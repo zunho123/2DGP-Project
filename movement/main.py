@@ -4,7 +4,9 @@ import time
 WINDOW_W, WINDOW_H = 1280, 720
 RUN_SPEED_PPS = 260.0
 ZOOM = 1.6
-CHAR_SCALE = 1.6
+CHAR_SCALE = 1.2
+GRAVITY_PPS2 = -2000.0
+GROUND_RATIO = 0.07
 
 open_canvas(WINDOW_W, WINDOW_H)
 
@@ -24,13 +26,14 @@ data_idle['aw'] = sum(data_idle['widths']) / len(data_idle['widths'])
 data_run['aw']  = sum(data_run['widths'])  / len(data_run['widths'])
 
 bg_w, bg_h = bg.w, bg.h
-GROUND_Y = 48
+ground_y = int(bg_h * GROUND_RATIO)
 
 IDLE, RUN = 0, 1
 state = IDLE
 dir = 1
 xw = bg_w // 2
-yw = GROUND_Y
+yw = ground_y
+vy = 0.0
 frame = 0
 tacc = 0.0
 left_pressed = False
@@ -38,14 +41,14 @@ right_pressed = False
 running = True
 last = time.time()
 
-def clamp(a, lo, hi):
-    return max(lo, min(hi, a))
+def clamp(v, lo, hi):
+    return max(lo, min(hi, v))
 
 def camera_view(x_center, zoom):
     vw = WINDOW_W / zoom
     vh = WINDOW_H / zoom
     left = clamp(x_center - vw / 2, 0, max(0, bg_w - vw))
-    bottom = clamp(0, 0, max(0, bg_h - vh))
+    bottom = 0
     return left, bottom, vw, vh
 
 def draw_world_bg(left, bottom, vw, vh):
@@ -98,6 +101,12 @@ while running:
     if state == RUN:
         xw += dir * RUN_SPEED_PPS * dt
         xw = clamp(xw, 20, bg_w - 20)
+
+    vy += GRAVITY_PPS2 * dt
+    yw += vy * dt
+    if yw < ground_y:
+        yw = ground_y
+        vy = 0.0
 
     gap = 0.08 if state == IDLE else 0.04
     maxf = len(data_idle['widths']) if state == IDLE else len(data_run['widths'])
