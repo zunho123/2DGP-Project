@@ -15,6 +15,7 @@ bg = load_image('ClubNeon1.png')
 img_idle = load_image('idle.png')
 img_run  = load_image('run.png')
 img_jump = load_image('jump.png')
+img_enemy_idle = load_image('enemy_idle.png')
 
 data_idle = dict(
     lefts  =[8,45,84,123,162,202,242,282,321,360],
@@ -55,6 +56,12 @@ right_pressed = False
 running = True
 last = time.time()
 
+enemy_cols = 12
+enemy_xw = bg_w // 2
+enemy_yw = ground_y
+enemy_frame = 0
+enemy_tacc = 0.0
+
 def clampv(v, lo, hi):
     return max(lo, min(hi, v))
 
@@ -84,6 +91,23 @@ def draw_world_sprite(img, data, fi, x, y, flip, left, bottom, vw, vh):
         img.clip_composite_draw(l_src, 0, w_src, h, 0, 'h', sxp, syp, dw, dh)
     else:
         img.clip_draw(l_src, 0, w_src, h, sxp, syp, dw, dh)
+
+def draw_world_strip(img, cols, fi, x, y, flip, left, bottom, vw, vh):
+    sx = WINDOW_W / vw
+    sy = WINDOW_H / vh
+    fw = img.w // cols
+    fh = img.h
+    dw = int(fw * CHAR_SCALE * sx)
+    dh = int(fh * CHAR_SCALE * sy)
+    cx = x - left
+    cy = y - bottom
+    sxp = int(cx * sx)
+    syp = int(cy * sy) + dh // 2
+    l_src = fw * (fi % cols)
+    if flip:
+        img.clip_composite_draw(l_src, 0, fw, fh, 0, 'h', sxp, syp, dw, dh)
+    else:
+        img.clip_draw(l_src, 0, fw, fh, sxp, syp, dw, dh)
 
 while running:
     now = time.time()
@@ -161,8 +185,15 @@ while running:
             jump_frame = min(jump_frame + 1, maxf - 1)
             tacc -= gap
 
+    enemy_gap = 0.08
+    enemy_tacc += dt
+    while enemy_tacc >= enemy_gap:
+        enemy_frame = (enemy_frame + 1) % enemy_cols
+        enemy_tacc -= enemy_gap
+
     clear_canvas()
     draw_world_bg(left, bottom, vw, vh)
+    draw_world_strip(img_enemy_idle, enemy_cols, enemy_frame, enemy_xw, enemy_yw, False, left, bottom, vw, vh)
     if state == IDLE:
         draw_world_sprite(img_idle, data_idle, frame, xw, yw, (dir == -1), left, bottom, vw, vh)
     elif state == RUN:
