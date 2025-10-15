@@ -15,6 +15,7 @@ bg = load_image('ClubNeon1.png')
 img_idle = load_image('idle.png')
 img_run  = load_image('run.png')
 img_jump = load_image('jump.png')
+img_attack = load_image('attack.png')
 img_enemy_idle = load_image('enemy_idle.png')
 
 data_idle = dict(
@@ -32,17 +33,23 @@ data_jump = dict(
     widths =[29,30,30,29,41,41,41,41],
     pad=1
 )
+data_attack = dict(
+    lefts  =[12,57,111,158,207,254,303],
+    widths =[38,47,40,42,40,42,42],
+    pad=0
+)
 
 def finalize(meta):
     pad = meta.get('pad', 0)
     eff = [max(1, w - 2 * pad) for w in meta['widths']]
     meta['aw'] = sum(eff) / len(eff)
-finalize(data_idle); finalize(data_run); finalize(data_jump)
+for d in (data_idle, data_run, data_jump, data_attack):
+    finalize(d)
 
 bg_w, bg_h = bg.w, bg.h
 ground_y = int(bg_h * GROUND_RATIO)
 
-IDLE, RUN, JUMP = 0, 1, 2
+IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
 state = IDLE
 dir = 1
 xw = bg_w // 2
@@ -50,7 +57,9 @@ yw = ground_y
 vy = 0.0
 frame = 0
 jump_frame = 0
+atk_frame = 0
 tacc = 0.0
+atk_tacc = 0.0
 left_pressed = False
 right_pressed = False
 running = True
@@ -133,18 +142,23 @@ while running:
             elif e.key == SDLK_RIGHT:
                 right_pressed = True
             elif e.key == SDLK_SPACE:
-                if state != JUMP and abs(yw - ground_y) < 1e-3:
+                if state != JUMP and abs(yw - ground_y) < 1e-3 and state != ATTACK:
                     state = JUMP
                     vy = JUMP_VEL_PPS
                     jump_frame = 0
                     tacc = 0.0
+            elif e.key == SDLK_a:
+                if state != JUMP and state != ATTACK:
+                    state = ATTACK
+                    atk_frame = 0
+                    atk_tacc = 0.0
         elif e.type == SDL_KEYUP:
             if e.key == SDLK_LEFT:
                 left_pressed = False
             elif e.key == SDLK_RIGHT:
                 right_pressed = False
 
-    if state != JUMP:
+    if state not in (JUMP, ATTACK):
         if left_pressed ^ right_pressed:
             state = RUN
             dir = -1 if left_pressed else 1
@@ -152,6 +166,8 @@ while running:
             state = IDLE
 
     move_dir = (-1 if left_pressed else 0) + (1 if right_pressed else 0)
+    if state == ATTACK:
+        move_dir = 0
     speed = RUN_SPEED_PPS if state != IDLE else 0.0
     if state == JUMP and move_dir != 0:
         speed *= 0.7
@@ -185,13 +201,26 @@ while running:
         while tacc >= gap:
             frame = (frame + 1) % maxf
             tacc -= gap
-    else:
+    elif state == JUMP:
         gap = 0.06
         maxf = len(data_jump['widths'])
         tacc += dt
         while tacc >= gap:
             jump_frame = min(jump_frame + 1, maxf - 1)
             tacc -= gap
+    else:
+        gap = 0.045
+        maxf = len(data_attack['widths'])
+        atk_tacc += dt
+        while atk_tacc >= gap:
+            atk_frame += 1
+            atk_tacc -= gap
+            if atk_frame >= maxf:
+                state = RUN if (left_pressed ^ right_pressed) else IDLE
+                frame = 0
+                tacc = 0.0
+                atk_frame = 0
+                break
 
     enemy_tacc += dt
     while enemy_tacc >= enemy_gap:
@@ -205,8 +234,10 @@ while running:
         draw_world_sprite(img_idle, data_idle, frame, xw, yw, (dir == -1), left, bottom, vw, vh)
     elif state == RUN:
         draw_world_sprite(img_run, data_run, frame, xw, yw, (dir == -1), left, bottom, vw, vh)
-    else:
+    elif state == JUMP:
         draw_world_sprite(img_jump, data_jump, jump_frame, xw, yw, (dir == -1), left, bottom, vw, vh)
+    else:
+        draw_world_sprite(img_attack, data_attack, atk_frame, xw, yw, (dir == -1), left, bottom, vw, vh)
     update_canvas()
     delay(0.001)
 
