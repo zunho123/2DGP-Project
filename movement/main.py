@@ -17,39 +17,28 @@ img_run  = load_image('run.png')
 img_jump = load_image('jump.png')
 img_attack = load_image('attack.png')
 img_enemy_idle = load_image('enemy_idle.png')
+img_enemy_dead = load_image('enemy_dead.png')
 
-data_idle = dict(
-    lefts  =[8,45,84,123,162,202,242,282,321,360],
-    widths =[31,31,32,32,33,33,33,32,32,31],
-    pad=1
-)
-data_run = dict(
-    lefts  =[11,55,98,141,184,227,271,314,359,405],
-    widths =[39,38,38,38,38,39,38,40,41,41],
-    pad=1
-)
-data_jump = dict(
-    lefts  =[11,45,80,115,168,214,260,306],
-    widths =[29,30,30,29,41,41,41,41],
-    pad=1
-)
-data_attack = dict(
-    lefts  =[12,57,111,158,207,254,303],
-    widths =[38,47,40,42,40,42,42],
-    pad=0
-)
+data_idle = dict(lefts=[8,45,84,123,162,202,242,282,321,360], widths=[31,31,32,32,33,33,33,32,32,31], pad=1)
+data_run  = dict(lefts=[11,55,98,141,184,227,271,314,359,405], widths=[39,38,38,38,38,39,38,40,41,41], pad=1)
+data_jump = dict(lefts=[11,45,80,115,168,214,260,306], widths=[29,30,30,29,41,41,41,41], pad=1)
+data_attack = dict(lefts=[12,57,111,158,207,254,303], widths=[38,47,40,42,40,42,42], pad=0)
+data_enemy_dead = dict(lefts=[15,50,89,132,175,218,274,335,403,470,535,599], widths=[30,26,29,29,33,30,34,25,22,21,21,22], pad=1)
 
 def finalize(meta):
     pad = meta.get('pad', 0)
     eff = [max(1, w - 2 * pad) for w in meta['widths']]
     meta['aw'] = sum(eff) / len(eff)
-for d in (data_idle, data_run, data_jump, data_attack):
+
+for d in (data_idle, data_run, data_jump, data_attack, data_enemy_dead):
     finalize(d)
 
 bg_w, bg_h = bg.w, bg.h
 ground_y = int(bg_h * GROUND_RATIO)
 
 IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
+ENEMY_IDLE, ENEMY_DEAD = 0, 1
+
 state = IDLE
 dir = 1
 xw = bg_w // 2
@@ -65,6 +54,7 @@ right_pressed = False
 running = True
 last = time.time()
 
+enemy_state = ENEMY_IDLE
 ENEMY_COLS = 12
 ENEMY_PAD = 0
 enemy_xw = min(bg_w - 20, xw + 220)
@@ -72,6 +62,8 @@ enemy_yw = ground_y
 enemy_frame = 0
 enemy_tacc = 0.0
 enemy_gap = 0.08
+enemy_dead_frame = 0
+enemy_dead_tacc = 0.0
 
 def clampv(v, lo, hi):
     return max(lo, min(hi, v))
@@ -125,6 +117,32 @@ def draw_world_strip(img, cols, fi, x, y, flip, left, bottom, vw, vh, pad=0):
         img.clip_composite_draw(l_src, 0, w_src, fh, 0, 'h', sxp, syp, dw, dh)
     else:
         img.clip_draw(l_src, 0, w_src, fh, sxp, syp, dw, dh)
+
+def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
+    return not (r1 < l2 or r2 < l1 or t1 < b2 or t2 < b1)
+
+def player_attack_rect():
+    fw = 70 * CHAR_SCALE
+    fh = 40 * CHAR_SCALE
+    off = 20 * CHAR_SCALE
+    if dir == 1:
+        l = xw + off
+        r = xw + off + fw
+    else:
+        l = xw - off - fw
+        r = xw - off
+    b = yw + 20 * CHAR_SCALE
+    t = b + fh
+    return l, b, r, t
+
+def enemy_aabb():
+    fw = (img_enemy_idle.w // ENEMY_COLS) * CHAR_SCALE * 0.6
+    fh = img_enemy_idle.h * CHAR_SCALE * 0.8
+    l = enemy_xw - fw * 0.5
+    r = enemy_xw + fw * 0.5
+    b = enemy_yw
+    t = enemy_yw + fh
+    return l, b, r, t
 
 while running:
     now = time.time()
@@ -222,14 +240,33 @@ while running:
                 atk_frame = 0
                 break
 
-    enemy_tacc += dt
-    while enemy_tacc >= enemy_gap:
-        enemy_frame = (enemy_frame + 1) % ENEMY_COLS
-        enemy_tacc -= enemy_gap
+    if enemy_state == ENEMY_IDLE:
+        enemy_tacc += dt
+        while enemy_tacc >= enemy_gap:
+            enemy_frame = (enemy_frame + 1) % ENEMY_COLS
+            enemy_tacc -= enemy_gap
+        if state == ATTACK and 2 <= atk_frame <= 5:
+            l1, b1, r1, t1 = player_attack_rect()
+            l2, b2, r2, t2 = enemy_aabb()
+            if rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
+                enemy_state = ENEMY_DEAD
+                enemy_dead_frame = 0
+                enemy_dead_tacc = 0.0
+
+    if enemy_state == ENEMY_DEAD:
+        enemy_dead_tacc += dt
+        while enemy_dead_tacc >= 0.06:
+            if enemy_dead_frame < len(data_enemy_dead['widths']) - 1:
+                enemy_dead_frame += 1
+            enemy_dead_tacc -= 0.06
 
     clear_canvas()
     draw_world_bg(left, bottom, vw, vh)
-    draw_world_strip(img_enemy_idle, ENEMY_COLS, enemy_frame, enemy_xw, enemy_yw, False, left, bottom, vw, vh, pad=ENEMY_PAD)
+    if enemy_state == ENEMY_IDLE:
+        draw_world_strip(img_enemy_idle, ENEMY_COLS, enemy_frame, enemy_xw, enemy_yw, False, left, bottom, vw, vh, pad=ENEMY_PAD)
+    else:
+        draw_world_sprite(img_enemy_dead, data_enemy_dead, enemy_dead_frame, enemy_xw, enemy_yw, False, left, bottom, vw, vh)
+
     if state == IDLE:
         draw_world_sprite(img_idle, data_idle, frame, xw, yw, (dir == -1), left, bottom, vw, vh)
     elif state == RUN:
