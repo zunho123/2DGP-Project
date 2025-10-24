@@ -9,6 +9,9 @@ GRAVITY_PPS2 = -2000.0
 JUMP_VEL_PPS = 520.0
 GROUND_RATIO = 0.07
 STEP_UP_MAX = 30.0
+FOOT_HALF = 12.0
+COYOTE_TIME = 0.12
+DROP_EPS = 1.0
 
 open_canvas(WINDOW_W, WINDOW_H)
 
@@ -47,6 +50,9 @@ platforms = [
     (1500, 1750, ground_y + 220),
 ]
 
+def clampv(v, lo, hi):
+    return max(lo, min(hi, v))
+
 def support_y_at(x):
     y = ground_y
     for x1, x2, sy in platforms:
@@ -54,8 +60,10 @@ def support_y_at(x):
             y = sy
     return y
 
-def on_ground():
-    return abs(yw - support_y_at(xw)) < 1e-3
+def support_y_feet(x):
+    a = support_y_at(x - FOOT_HALF * CHAR_SCALE)
+    b = support_y_at(x + FOOT_HALF * CHAR_SCALE)
+    return max(ground_y, a, b)
 
 IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
 ENEMY_IDLE, ENEMY_DEAD = 0, 1
@@ -75,6 +83,9 @@ right_pressed = False
 running = True
 last = time.time()
 
+grounded = True
+coyote_timer = 0.0
+
 enemy_state = ENEMY_IDLE
 ENEMY_COLS = 12
 ENEMY_PAD = 0
@@ -85,9 +96,6 @@ enemy_tacc = 0.0
 enemy_gap = 0.08
 enemy_dead_frame = 0
 enemy_dead_tacc = 0.0
-
-def clampv(v, lo, hi):
-    return max(lo, min(hi, v))
 
 def camera_view(x_center, zoom):
     vw = WINDOW_W / zoom
@@ -181,11 +189,14 @@ while running:
             elif e.key == SDLK_RIGHT:
                 right_pressed = True
             elif e.key == SDLK_SPACE:
-                if state != JUMP and on_ground() and state != ATTACK:
-                    state = JUMP
-                    vy = JUMP_VEL_PPS
-                    jump_frame = 0
-                    tacc = 0.0
+                if state != JUMP and state != ATTACK:
+                    if grounded or coyote_timer <= COYOTE_TIME:
+                        state = JUMP
+                        vy = JUMP_VEL_PPS
+                        jump_frame = 0
+                        tacc = 0.0
+                        grounded = False
+                        coyote_timer = COYOTE_TIME + 1.0
             elif e.key == SDLK_a:
                 if state != JUMP and state != ATTACK:
                     state = ATTACK
@@ -211,22 +222,37 @@ while running:
     if state == JUMP and move_dir != 0:
         speed *= 0.7
         dir = -1 if move_dir < 0 else 1
+
+    x_prev = xw
     xw += move_dir * speed * dt
     xw = clampv(xw, 20, bg_w - 20)
 
     y_prev = yw
     vy += GRAVITY_PPS2 * dt
     yw += vy * dt
-    support = support_y_at(xw)
-    if vy <= 0 and y_prev >= support and yw < support:
+
+    support_prev = support_y_feet(x_prev)
+    support = support_y_feet(xw)
+
+    if vy <= 0 and y_prev >= support - DROP_EPS and yw < support + DROP_EPS:
         yw = support
         vy = 0.0
         if state == JUMP:
             state = RUN if move_dir != 0 else IDLE
             frame = 0
             tacc = 0.0
-    elif state != JUMP and yw < support <= yw + STEP_UP_MAX and vy <= 0:
-        yw = support
+    elif state != JUMP and vy <= 0 and move_dir != 0:
+        if support > support_prev and support_prev <= y_prev + DROP_EPS and (support - yw) <= STEP_UP_MAX:
+            yw = support
+            vy = 0.0
+
+    if abs(yw - support) <= DROP_EPS and vy == 0.0:
+        if not grounded:
+            grounded = True
+        coyote_timer = 0.0
+    else:
+        grounded = False
+        coyote_timer += dt
 
     left, bottom, vw, vh = camera_view(xw, ZOOM)
 
