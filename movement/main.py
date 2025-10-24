@@ -8,6 +8,7 @@ CHAR_SCALE = 1.0
 GRAVITY_PPS2 = -2000.0
 JUMP_VEL_PPS = 520.0
 GROUND_RATIO = 0.07
+STEP_UP_MAX = 30.0
 
 open_canvas(WINDOW_W, WINDOW_H)
 
@@ -55,7 +56,6 @@ def support_y_at(x):
 
 def on_ground():
     return abs(yw - support_y_at(xw)) < 1e-3
-
 
 IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
 ENEMY_IDLE, ENEMY_DEAD = 0, 1
@@ -108,7 +108,7 @@ def draw_world_sprite(img, data, fi, x, y, flip, left, bottom, vw, vh):
     dw = int(w_src * CHAR_SCALE * sx)
     dh = int(h * CHAR_SCALE * sy)
     cx = (x + ((w_src - data['aw']) / 2)) - left
-    cy = (y) - bottom
+    cy = y - bottom
     sxp = int(cx * sx)
     syp = int(cy * sy) + dh // 2
     if flip:
@@ -181,7 +181,7 @@ while running:
             elif e.key == SDLK_RIGHT:
                 right_pressed = True
             elif e.key == SDLK_SPACE:
-                if state != JUMP and abs(yw - ground_y) < 1e-3 and state != ATTACK:
+                if state != JUMP and on_ground() and state != ATTACK:
                     state = JUMP
                     vy = JUMP_VEL_PPS
                     jump_frame = 0
@@ -214,15 +214,19 @@ while running:
     xw += move_dir * speed * dt
     xw = clampv(xw, 20, bg_w - 20)
 
+    y_prev = yw
     vy += GRAVITY_PPS2 * dt
     yw += vy * dt
-    if yw < ground_y:
-        yw = ground_y
+    support = support_y_at(xw)
+    if vy <= 0 and y_prev >= support and yw < support:
+        yw = support
         vy = 0.0
         if state == JUMP:
             state = RUN if move_dir != 0 else IDLE
             frame = 0
             tacc = 0.0
+    elif state != JUMP and yw < support <= yw + STEP_UP_MAX and vy <= 0:
+        yw = support
 
     left, bottom, vw, vh = camera_view(xw, ZOOM)
 
