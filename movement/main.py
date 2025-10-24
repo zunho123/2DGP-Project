@@ -40,6 +40,23 @@ for d in (data_idle, data_run, data_jump, data_attack, data_enemy_dead):
 bg_w, bg_h = bg.w, bg.h
 ground_y = int(bg_h * GROUND_RATIO)
 
+platforms = [
+    (420, 620, ground_y + 60),
+    (900, 1120, ground_y + 140),
+    (1500, 1750, ground_y + 220),
+]
+
+def support_y_at(x):
+    y = ground_y
+    for x1, x2, sy in platforms:
+        if x1 <= x <= x2 and sy > y:
+            y = sy
+    return y
+
+def on_ground():
+    return abs(yw - support_y_at(xw)) < 1e-3
+
+
 IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
 ENEMY_IDLE, ENEMY_DEAD = 0, 1
 
