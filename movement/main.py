@@ -8,9 +8,11 @@ CHAR_SCALE = 1.0
 GRAVITY_PPS2 = -2000.0
 JUMP_VEL_PPS = 520.0
 GROUND_RATIO = 0.07
-STEP_UP_MAX = 30.0
-FOOT_HALF = 12.0
-COYOTE_TIME = 0.12
+STEP_UP_MAX = 36.0
+FOOT_HALF = 22.0
+GROUND_LOW = 2.0
+GROUND_HIGH = 6.0
+COYOTE_TIME = 0.16
 DROP_EPS = 1.0
 
 open_canvas(WINDOW_W, WINDOW_H)
@@ -27,11 +29,7 @@ data_idle = dict(lefts=[8,45,84,123,162,202,242,282,321,360], widths=[31,31,32,3
 data_run  = dict(lefts=[11,55,98,141,184,227,271,314,359,405], widths=[39,38,38,38,38,39,38,40,41,41], pad=1)
 data_jump = dict(lefts=[11,45,80,115,168,214,260,306], widths=[29,30,30,29,41,41,41,41], pad=1)
 data_attack = dict(lefts=[12,57,111,158,207,254,303], widths=[38,47,40,42,40,42,42], pad=0)
-data_enemy_dead = dict(
-    lefts  =[13, 48, 89, 132, 175, 218, 274, 325, 394, 459, 523, 588],
-    widths =[32, 35, 41, 41, 41, 41, 40, 65, 57, 55, 56, 55],
-    pad=1
-)
+data_enemy_dead = dict(lefts=[13,48,89,132,175,218,274,325,394,459,523,588], widths=[32,35,41,41,41,41,40,65,57,55,56,55], pad=1)
 
 def finalize(meta):
     pad = meta.get('pad', 0)
@@ -60,10 +58,14 @@ def support_y_at(x):
             y = sy
     return y
 
-def support_y_feet(x):
-    a = support_y_at(x - FOOT_HALF * CHAR_SCALE)
-    b = support_y_at(x + FOOT_HALF * CHAR_SCALE)
-    return max(ground_y, a, b)
+def support_y_span(x):
+    h = FOOT_HALF * CHAR_SCALE
+    s1 = support_y_at(x - h)
+    s2 = support_y_at(x - h * 0.5)
+    s3 = support_y_at(x)
+    s4 = support_y_at(x + h * 0.5)
+    s5 = support_y_at(x + h)
+    return max(ground_y, s1, s2, s3, s4, s5)
 
 IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
 ENEMY_IDLE, ENEMY_DEAD = 0, 1
@@ -231,28 +233,34 @@ while running:
     vy += GRAVITY_PPS2 * dt
     yw += vy * dt
 
-    support_prev = support_y_feet(x_prev)
-    support = support_y_feet(xw)
+    support_prev = support_y_span(x_prev)
+    support = support_y_span(xw)
 
-    if vy <= 0 and y_prev >= support - DROP_EPS and yw < support + DROP_EPS:
-        yw = support
-        vy = 0.0
-        if state == JUMP:
-            state = RUN if move_dir != 0 else IDLE
-            frame = 0
-            tacc = 0.0
-    elif state != JUMP and vy <= 0 and move_dir != 0:
-        if support > support_prev and support_prev <= y_prev + DROP_EPS and (support - yw) <= STEP_UP_MAX:
+    if vy <= 0:
+        if y_prev - support <= GROUND_LOW and yw <= support + DROP_EPS:
             yw = support
             vy = 0.0
-
-    if abs(yw - support) <= DROP_EPS and vy == 0.0:
-        if not grounded:
+            if state == JUMP:
+                state = RUN if move_dir != 0 else IDLE
+                frame = 0
+                tacc = 0.0
             grounded = True
+            coyote_timer = 0.0
+        elif state != JUMP and move_dir != 0:
+            if support > support_prev and (support - yw) <= STEP_UP_MAX and y_prev - support_prev <= GROUND_HIGH:
+                yw = support
+                vy = 0.0
+                grounded = True
+                coyote_timer = 0.0
+
+    if (yw - support) >= GROUND_HIGH and vy < 0:
+        if grounded:
+            grounded = False
+            coyote_timer = 0.0
+        else:
+            coyote_timer += dt
+    elif grounded:
         coyote_timer = 0.0
-    else:
-        grounded = False
-        coyote_timer += dt
 
     left, bottom, vw, vh = camera_view(xw, ZOOM)
 
