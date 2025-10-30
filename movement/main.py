@@ -11,7 +11,11 @@ GROUND_RATIO = 0.07
 
 open_canvas(WINDOW_W, WINDOW_H)
 
-bg = load_image('ClubNeon1.png')
+bg = load_image('stage1.png')
+
+bg_w, bg_h = bg.w, bg.h
+ZOOM = max(WINDOW_W / bg_w, WINDOW_H / bg_h)
+
 img_idle = load_image('idle.png')
 img_run  = load_image('run.png')
 img_jump = load_image('jump.png')
@@ -37,7 +41,6 @@ def finalize(meta):
 for d in (data_idle, data_run, data_jump, data_attack, data_enemy_dead):
     finalize(d)
 
-bg_w, bg_h = bg.w, bg.h
 ground_y = int(bg_h * GROUND_RATIO)
 
 IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
