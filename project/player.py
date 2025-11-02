@@ -10,7 +10,7 @@ class Player:
         self.vy = 0.0
         self.dir = 1
         self.state = IDLE
-        self.scale = 1.0
+        self.scale = 0.70
         self.run_speed_pps = 260.0
         self.gravity_pps2 = -2000.0
         self.jump_vel_pps = 520.0
@@ -27,7 +27,7 @@ class Player:
         self.foot_run = 2
         self.foot_jump = 4
         self.foot_attack = 2
-        self.ground_off = 12
+        self.ground_off = -8.0
 
     def input_axis(self, l, r):
         self.ax = (-1 if l else 0) + (1 if r else 0)

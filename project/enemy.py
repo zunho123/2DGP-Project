@@ -10,7 +10,7 @@ class Enemy:
         self.y = stage.ground_y
         self.alive = True
         self.state = ENEMY_IDLE
-        self.scale = 1.0
+        self.scale = 0.60
         self.idle_img = load_image('enemy_idle.png')
         self.idle_cols = 12
         self.idle_pad = 0
@@ -20,7 +20,8 @@ class Enemy:
         self.dead = SpriteAnim('enemy_dead.png', [13,48,89,132,175,218,274,325,394,459,523,588], [32,35,41,41,41,41,40,65,57,55,56,55], pad=1)
         self.dead.set_gap(0.06)
         self.foot = 6
-        self.ground_off = 6
+        self.ground_off = -20
+        self.dir = -1
 
     def get_bb(self):
         fw = (self.idle_img.w // self.idle_cols) * self.scale * 0.6
@@ -57,6 +58,9 @@ class Enemy:
             dh = int(fh * self.scale * sy)
             sxp, syp_base = self.stage.world_to_screen(self.x, self.y)
             syp = syp_base + dh // 2 - int(self.foot * self.scale * sy) - int(self.ground_off * self.scale * sy)
-            self.idle_img.clip_draw(l_src, 0, fw, fh, sxp, syp, dw, dh)
+            if self.dir == -1:
+                self.idle_img.clip_composite_draw(l_src, 0, fw, fh, 0, 'h', sxp, syp, dw, dh)
+            else:
+                self.idle_img.clip_draw(l_src, 0, fw, fh, sxp, syp, dw, dh)
         else:
-            self.dead.draw_world(self.stage, self.x, self.y, self.scale, flip=False, foot_off_px=self.foot, ground_off_px=self.ground_off)
+            self.dead.draw_world(self.stage, self.x, self.y, self.scale, flip=(self.dir == -1), foot_off_px=self.foot, ground_off_px=self.ground_off)
