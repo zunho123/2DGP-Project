@@ -18,10 +18,12 @@ last_time = 0.0
 def enter():
     global stage, player, enemy, last_time
     open_canvas(1280, 720)
-    stage = Stage('stage1.png', 1280, 720)
+    from stage import Stage
+    stage = Stage('stage1.png', 1280, 720, zoom_mul=1.0, ground_ratio=0.0, ground_px=0)
     player = Player(stage)
-    enemy = Enemy(stage, player.x + 220)
+    enemy = Enemy(stage, player.x + 120)
     last_time = time.time()
+
 
 def exit():
     close_canvas()
