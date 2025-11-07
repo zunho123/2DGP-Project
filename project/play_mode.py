@@ -4,35 +4,28 @@ from stage import Stage
 from player import Player
 from enemy import Enemy
 
-name = 'play_mode'
+WINDOW_W, WINDOW_H = 1280, 720
 
 stage = None
 player = None
 enemy = None
+last_time = 0.0
 
 left_pressed = False
 right_pressed = False
 running = True
-last_time = 0.0
 
 def enter():
     global stage, player, enemy, last_time
-    open_canvas(1280, 720)
-    from stage import Stage
-    stage = Stage('stage1.png', 1280, 720, zoom_mul=1.0, ground_ratio=0.0, ground_px=0)
+    open_canvas(WINDOW_W, WINDOW_H)
+    stage = Stage('stage1.png', WINDOW_W, WINDOW_H, zoom_mul=1.4, ground_ratio=0.0, ground_px=22, snap=6.0)
     player = Player(stage)
-    enemy = Enemy(stage, player.x + 120)
+    enemy = Enemy(stage, player.x + 160)
+    enemy.dir = -1
     last_time = time.time()
-
 
 def exit():
     close_canvas()
-
-def pause():
-    pass
-
-def resume():
-    pass
 
 def handle_events():
     global left_pressed, right_pressed, running
@@ -56,25 +49,45 @@ def handle_events():
                 left_pressed = False
             elif e.key == SDLK_RIGHT:
                 right_pressed = False
-    player.input_axis(-1 if left_pressed else 0, 1 if right_pressed else 0)
 
 def update():
     global last_time
     now = time.time()
     dt = now - last_time
     last_time = now
-    player.update(dt)
-    enemy.update(dt)
-    if enemy.alive and player.attack_active() and player.attack_hit(enemy.get_bb()):
-        enemy.kill()
-    stage.set_view_by_center(player.x)
+
+    move_dir = (-1 if left_pressed else 0) + (1 if right_pressed else 0)
+    player.update(dt, move_dir)
+    enemy.update(dt, 0)
+
+    player.ground_y = stage.ground_y + player.ground_off
+    enemy.ground_y = stage.ground_y + enemy.ground_off
+
+    lead = 120 if player.dir == 1 else -120
+    stage.set_view_follow(player.x, dt, lead_px=lead)
 
 def draw():
     clear_canvas()
     stage.draw()
-    enemy.draw()
-    player.draw()
+    enemy.draw(stage)
+    player.draw(stage)
     update_canvas()
 
-def get_running():
-    return running
+def pause():
+    pass
+
+def resume():
+    pass
+
+def run():
+    enter()
+    global running
+    while running:
+        handle_events()
+        update()
+        draw()
+        delay(0.001)
+    exit()
+
+if __name__ == "__main__":
+    run()
