@@ -1,7 +1,7 @@
 from pico2d import *
 
 class Stage:
-    def __init__(self, bg_path, window_w=1280, window_h=720, zoom=1.6, ground_px=36):
+    def __init__(self, bg_path, window_w=1280, window_h=720, zoom=2.2, ground_px=36):
         self.win_w = window_w
         self.win_h = window_h
         self.bg = load_image(bg_path)
@@ -22,6 +22,16 @@ class Stage:
         if v > hi:
             return hi
         return v
+
+    def refresh_view(self):
+        self.vw = self.win_w / self.zoom
+        self.vh = self.win_h / self.zoom
+
+    def set_zoom(self, zoom):
+        self.zoom = zoom
+        cx = self.cam_x + self.vw * 0.5
+        self.refresh_view()
+        self.cam_x = self.clamp(cx - self.vw * 0.5, 0, max(0, self.w - self.vw))
 
     def to_screen(self, x, y):
         sx = self.win_w / self.vw

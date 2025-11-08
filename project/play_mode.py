@@ -11,9 +11,9 @@ move_dir = 0
 
 def enter():
     global stage, player, enemy
-    stage = Stage('stage1.png', window_w=1280, window_h=720, zoom=1.6, ground_px=36)
-    player = Player(stage, scale=1.0)
-    enemy = Enemy(stage, scale=0.9)
+    stage = Stage('stage1.png', window_w=1280, window_h=720, zoom=2.2, ground_px=36)
+    player = Player(stage)
+    enemy = Enemy(stage)
 
 def exit():
     pass

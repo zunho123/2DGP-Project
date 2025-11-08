@@ -16,7 +16,7 @@ class Player:
         self.char_scale = scale
         self.x = self.stage.w // 2
         self.ground_off = 0
-        self.y = self.stage.ground_y + self.ground_off + 2
+        self.y = self.stage.ground_y + self.ground_off
         self.dir = 1
         self.state = 'idle'
         self.frame = 0
