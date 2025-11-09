@@ -46,6 +46,9 @@ class Enemy:
             self.dead_tacc = 0.0
             self.vy = 0.0
 
+    def is_dead(self):
+        return self.state == EN_DEAD
+
     def aabb(self):
         fw = (self.img_idle.w // self.cols) * self.char_scale * 0.6
         fh = self.img_idle.h * self.char_scale * 0.8

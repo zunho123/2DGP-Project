@@ -15,6 +15,9 @@ can_enter_next = False
 TRIGGER_X_MAX = 120
 PROMPT_SIZE = 56
 
+def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
+    return not (r1 < l2 or r2 < l1 or t1 < b2 or t2 < b1)
+
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next
     stage = Stage('stage1.png', window_w=1280, window_h=720, zoom=4.0, ground_px=15)
@@ -55,14 +58,22 @@ def handle_events(events):
 def _enemy_dead():
     if enemy is None:
         return True
-    if hasattr(enemy, 'is_dead') and callable(enemy.is_dead):
+    if hasattr(enemy, 'is_dead'):
         return enemy.is_dead()
-    return getattr(enemy, 'dead', False)
+    if hasattr(enemy, 'is_alive'):
+        return not enemy.is_alive()
+    return False
 
 def update(dt):
     global can_enter_next
     player.update(dt, move_dir)
     if enemy:
+        if hasattr(enemy, 'is_alive') and enemy.is_alive():
+            if hasattr(player, 'is_attacking_active') and player.is_attacking_active():
+                l1, b1, r1, t1 = player.attack_hitbox()
+                l2, b2, r2, t2 = enemy.aabb()
+                if rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
+                    enemy.die()
         enemy.update(dt)
     stage.update(dt, player.x)
     near_stairs = (player.x <= TRIGGER_X_MAX) and abs(player.y - stage.ground_y) < 8
