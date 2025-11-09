@@ -9,11 +9,15 @@ player = None
 enemy = None
 move_dir = 0
 
+def rect_overlap(l1,b1,r1,t1,l2,b2,r2,t2):
+    return not (r1 < l2 or r2 < l1 or t1 < b2 or t2 < b1)
+
 def enter():
-    global stage, player, enemy
-    stage = Stage('stage1.png', window_w=1280, window_h=720, zoom=2.2, ground_px=36)
+    global stage, player, enemy, move_dir
+    stage = Stage('stage1.png', window_w=1280, window_h=720, zoom=4.0, ground_px=15)
     player = Player(stage)
     enemy = Enemy(stage)
+    move_dir = 0
 
 def exit():
     pass
@@ -42,6 +46,11 @@ def handle_events(events):
 
 def update(dt):
     player.update(dt, move_dir)
+    if enemy.is_alive() and player.is_attacking_active():
+        l1,b1,r1,t1 = player.attack_hitbox()
+        l2,b2,r2,t2 = enemy.aabb()
+        if rect_overlap(l1,b1,r1,t1,l2,b2,r2,t2):
+            enemy.die()
     enemy.update(dt)
     stage.update(dt, player.x)
 
