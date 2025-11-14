@@ -21,7 +21,7 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next
-    stage = Stage('stage1.png', window_w=1280, window_h=720, zoom=4.0, ground_px=15)
+    stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
     up_hint = load_image('upkey.png')

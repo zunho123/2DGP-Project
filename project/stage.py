@@ -13,7 +13,7 @@ class Stage:
         self.cam_y = 0.0
         self.ground_y = ground_px
         self.platforms = [(0, self.w, self.ground_y), (96, self.w - 96, int(self.h * 0.5))]
-        self.edge_margin = 6
+        self.edge_margin = 60
         self.follow_k = 8.0
 
     def clamp(self, v, lo, hi):
@@ -72,7 +72,7 @@ class Stage:
     def apply_physics(self, actor, dt, move_dir):
         prev_y = actor.y
         actor.x += move_dir * actor.run_speed * dt
-        actor.x = self.clamp(actor.x, self.edge_margin, self.w - self.edge_margin)
+        actor.x = self.clamp(actor.x, self.edge_margin, self.w - self.edge_margin - 25)
         actor.vy += actor.gravity * dt
         new_y = actor.y + actor.vy * dt
         new_y, landed, support = self.snap_to_platform(actor.x, prev_y, new_y, actor.ground_off)

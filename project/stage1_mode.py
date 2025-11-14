@@ -13,9 +13,9 @@ PLAYER_SCALE_STAGE1_2 = 2.0
 
 def enter():
     global stage, player, move_dir, left_pressed, right_pressed
-    stage = Stage('stage1-2.png', window_w=1280, window_h=720, zoom=1.0, ground_px=155)
+    stage = Stage('stage1-2.png', window_w=1920, window_h=1080, zoom=1.0, ground_px=220)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1_2)
-    player.x = 420
+    player.x = 580
     player.y = stage.ground_y + player.ground_off + 2
     move_dir = 0
     left_pressed = False
