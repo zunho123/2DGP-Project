@@ -14,6 +14,7 @@ can_enter_next = False
 
 TRIGGER_X_MAX = 120
 PROMPT_SIZE = 56
+PLAYER_SCALE_STAGE1 = 1.0
 
 def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
     return not (r1 < l2 or r2 < l1 or t1 < b2 or t2 < b1)
@@ -21,7 +22,7 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next
     stage = Stage('stage1.png', window_w=1280, window_h=720, zoom=4.0, ground_px=15)
-    player = Player(stage)
+    player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
     up_hint = load_image('upkey.png')
     move_dir = 0

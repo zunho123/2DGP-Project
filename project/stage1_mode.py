@@ -6,21 +6,28 @@ from player import Player
 stage = None
 player = None
 move_dir = 0
+left_pressed = False
+right_pressed = False
+
+PLAYER_SCALE_STAGE1_2 = 2.0
 
 def enter():
-    global stage, player, move_dir
-    stage = Stage('stage1-2.png', window_w=1280, window_h=720, zoom=4.0, ground_px=18)
-    player = Player(stage)
-    player.x = 40
-    player.y = stage.ground_y
+    global stage, player, move_dir, left_pressed, right_pressed
+    stage = Stage('stage1-2.png', window_w=1280, window_h=720, zoom=1.0, ground_px=155)
+    player = Player(stage, scale=PLAYER_SCALE_STAGE1_2)
+    player.x = 420
+    player.y = stage.ground_y + player.ground_off + 2
     move_dir = 0
-    stage.update(0.0, player.x)
+    left_pressed = False
+    right_pressed = False
+    target = stage.clamp(player.x - stage.vw * 0.5, 0, max(0, stage.w - stage.vw))
+    stage.cam_x = target
 
 def exit():
     pass
 
 def handle_events(events):
-    global move_dir
+    global move_dir, left_pressed, right_pressed
     for e in events:
         if e.type == SDL_QUIT:
             game_framework.quit()
@@ -28,20 +35,26 @@ def handle_events(events):
             if e.key == SDLK_ESCAPE:
                 game_framework.quit()
             elif e.key == SDLK_LEFT:
-                move_dir -= 1
+                left_pressed = True
             elif e.key == SDLK_RIGHT:
-                move_dir += 1
+                right_pressed = True
             elif e.key == SDLK_SPACE:
                 player.request_jump()
             elif e.key == SDLK_a:
                 player.request_attack()
         elif e.type == SDL_KEYUP:
             if e.key == SDLK_LEFT:
-                move_dir += 1
+                left_pressed = False
             elif e.key == SDLK_RIGHT:
-                move_dir -= 1
+                right_pressed = False
 
 def update(dt):
+    global move_dir
+    move_dir = 0
+    if left_pressed:
+        move_dir -= 1
+    if right_pressed:
+        move_dir += 1
     player.update(dt, move_dir)
     stage.update(dt, player.x)
 
