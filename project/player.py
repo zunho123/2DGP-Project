@@ -45,7 +45,7 @@ class Player:
             self.tacc = 0.0
 
     def request_attack(self):
-        if self.on_ground and self.state != ATTACK:
+        if self.state != ATTACK:
             self.state = ATTACK
             self.atk_frame = 0
             self.atk_tacc = 0.0
@@ -68,10 +68,12 @@ class Player:
         return l, b, r, t
 
     def update(self, dt, move_dir=0):
+        if move_dir != 0:
+            self.dir = 1 if move_dir > 0 else -1
+
         if self.state != JUMP and self.state != ATTACK:
             if move_dir != 0:
                 self.state = RUN
-                self.dir = 1 if move_dir > 0 else -1
             else:
                 self.state = IDLE
 
@@ -102,9 +104,12 @@ class Player:
                 self.atk_tacc -= 0.045
                 self.atk_frame += 1
                 if self.atk_frame >= len(self.data_attack['widths']):
-                    self.state = RUN if move_dir != 0 else IDLE
-                    self.frame = 0
-                    self.tacc = 0.0
+                    if self.on_ground:
+                        self.state = RUN if move_dir != 0 else IDLE
+                        self.frame = 0
+                        self.tacc = 0.0
+                    else:
+                        self.state = JUMP
                     self.atk_frame = 0
                     break
 
