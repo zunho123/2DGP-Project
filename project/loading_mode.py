@@ -32,10 +32,10 @@ def handle_events(events):
                 h = get_canvas_height()
                 mx = e.x
                 my = h - e.y - 1
-                left = int(w * 0.7)
-                right = int(w * 0.95)
-                bottom = int(h * 0.45)
-                top = int(h * 0.55)
+                left = int(w * 0.6)
+                right = int(w * 1.0)
+                bottom = int(h * 0.30)
+                top = int(h * 0.50)
                 if left <= mx <= right and bottom <= my <= top:
                     game_framework.change_state(play_mode)
 

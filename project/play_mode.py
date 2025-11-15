@@ -11,6 +11,7 @@ enemy = None
 move_dir = 0
 up_hint = None
 can_enter_next = False
+bgm = None
 
 TRIGGER_X_MAX = 120
 PROMPT_SIZE = 56
@@ -20,16 +21,22 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
     return not (r1 < l2 or r2 < l1 or t1 < b2 or t2 < b1)
 
 def enter():
-    global stage, player, enemy, up_hint, move_dir, can_enter_next
+    global stage, player, enemy, up_hint, move_dir, can_enter_next, bgm
     stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
     up_hint = load_image('upkey.png')
     move_dir = 0
     can_enter_next = False
+    bgm = load_music('song_boss1.ogg')
+    bgm.set_volume(64)
+    bgm.repeat_play()
 
 def exit():
-    pass
+    global bgm
+    if bgm is not None:
+        bgm.stop()
+    bgm = None
 
 def handle_events(events):
     global move_dir, can_enter_next
