@@ -9,8 +9,8 @@ class Enemy:
         self.img_dead = load_image('enemy_dead.png')
         self.cols = 12
         self.data_dead = dict(
-            lefts  =[13,48,89,132,175,218,274,325,394,459,523,588],
-            widths =[32,35,41,41,41,41,40,65,57,55,56,55],
+            lefts=[13, 48, 89, 132, 175, 218, 274, 325, 394, 459, 523, 588],
+            widths=[32, 35, 41, 41, 41, 41, 40, 65, 57, 55, 56, 55],
             pad=1
         )
         pad = self.data_dead.get('pad', 0)
@@ -51,12 +51,15 @@ class Enemy:
 
     def aabb(self):
         fw = (self.img_idle.w // self.cols) * self.char_scale * 0.6
-        fh = self.img_idle.h * self.char_scale * 0.8
+        fh = self.img_idle.h * self.char_scale * 0.8 + 5
         l = self.x - fw * 0.5
         r = self.x + fw * 0.5
-        b = self.y
+        b = self.y + 8
         t = self.y + fh
         return l, b, r, t
+
+    def get_bb(self):
+        return self.aabb()
 
     def update(self, dt):
         self.stage.apply_physics(self, dt, 0)
@@ -74,6 +77,12 @@ class Enemy:
 
     def draw(self):
         if self.state == EN_IDLE:
-            self.stage.draw_strip(self.img_idle, self.cols, self.frame, self.x, self.y, self.char_scale, self.dir == -1, pad=0)
+            self.stage.draw_strip(self.img_idle, self.cols, self.frame,
+                                  self.x, self.y, self.char_scale, self.dir == -1, pad=0)
         else:
-            self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame, self.x, self.y, self.char_scale, False)
+            self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame,
+                                  self.x, self.y, self.char_scale, False)
+        l, b, r, t = self.get_bb()
+        sx1, sy1 = self.stage.to_screen(l, b)
+        sx2, sy2 = self.stage.to_screen(r, t)
+        draw_rectangle(sx1, sy1, sx2, sy2)
