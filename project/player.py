@@ -126,11 +126,16 @@ class Player:
         if move_dir != 0:
             self.dir = 1 if move_dir > 0 else -1
 
-        if self.state != JUMP and self.state != ATTACK and self.state != ROLL:
+        if self.state not in (JUMP, ATTACK, ROLL):
             if move_dir != 0:
                 self.state = RUN
             else:
                 self.state = IDLE
+
+        phys_dir = move_dir
+        if self.state == ROLL and phys_dir == 0:
+            phys_dir = self.dir
+        self.stage.apply_physics(self, dt, phys_dir)
 
         if self.state == IDLE:
             self.tacc += dt
@@ -170,7 +175,7 @@ class Player:
                     self.roll_frame = 0
                     break
 
-        else:
+        else: 
             self.atk_tacc += dt
             while self.atk_tacc >= 0.045:
                 self.atk_tacc -= 0.045
@@ -191,11 +196,6 @@ class Player:
                         self.state = JUMP
                     self.atk_frame = 0
                     break
-
-        phys_dir = move_dir
-        if self.state == ROLL and phys_dir == 0:
-            phys_dir = self.dir
-        self.stage.apply_physics(self, dt, phys_dir)
 
         if self.slash_playing:
             self.slash_tacc += dt
