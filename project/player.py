@@ -1,6 +1,7 @@
 from pico2d import *
 
-IDLE, RUN, JUMP, ATTACK = 0, 1, 2, 3
+IDLE, RUN, JUMP, ATTACK, ROLL = 0, 1, 2, 3, 4
+
 
 class Player:
     def __init__(self, stage, scale=1.0):
@@ -9,6 +10,7 @@ class Player:
         self.img_run = load_image('run.png')
         self.img_jump = load_image('jump.png')
         self.img_attack = load_image('attack.png')
+        self.img_roll = load_image('rolling.png')
 
         self.data_idle = dict(
             lefts=[8, 45, 84, 123, 162, 202, 242, 282, 321, 360],
@@ -30,8 +32,13 @@ class Player:
             widths=[38, 47, 40, 42, 40, 42, 42],
             pad=0
         )
+        self.data_roll = dict(
+            lefts=[11, 63, 104, 145, 187, 232, 283],
+            widths=[47, 37, 36, 37, 40, 46, 43],
+            pad=0
+        )
 
-        for d in (self.data_idle, self.data_run, self.data_jump, self.data_attack):
+        for d in (self.data_idle, self.data_run, self.data_jump, self.data_attack, self.data_roll):
             pad = d.get('pad', 0)
             eff = [max(1, w - 2 * pad) for w in d['widths']]
             d['aw'] = sum(eff) / len(eff)
@@ -48,6 +55,8 @@ class Player:
         self.prev_atk_frame = 0
         self.tacc = 0.0
         self.atk_tacc = 0.0
+        self.roll_frame = 0
+        self.roll_tacc = 0.0
         self.run_speed = 260.0
         self.gravity = -2000.0
         self.jump_vel = 520.0
@@ -60,20 +69,29 @@ class Player:
         self.slash_tacc = 0.0
         self.slash_playing = False
 
+        self.invincible = False
+
     def request_jump(self):
-        if self.on_ground and self.state != ATTACK:
+        if self.on_ground and self.state not in (ATTACK, ROLL):
             self.state = JUMP
             self.vy = self.jump_vel
             self.jump_frame = 0
             self.tacc = 0.0
 
     def request_attack(self):
-        if self.state != ATTACK:
+        if self.state not in (ATTACK, ROLL):
             self.state = ATTACK
             self.prev_atk_frame = 0
             self.atk_frame = 0
             self.atk_tacc = 0.0
             self.slash_playing = False
+
+    def request_roll(self):
+        if self.on_ground and (self.state == IDLE or self.state == RUN):
+            self.state = ROLL
+            self.roll_frame = 0
+            self.roll_tacc = 0.0
+            self.invincible = True
 
     def is_attacking_active(self):
         return self.state == ATTACK and 2 <= self.atk_frame <= 5
@@ -101,17 +119,18 @@ class Player:
         t = self.y + h
         return l, b, r, t
 
+    def is_vulnerable(self):
+        return not self.invincible
+
     def update(self, dt, move_dir=0):
         if move_dir != 0:
             self.dir = 1 if move_dir > 0 else -1
 
-        if self.state != JUMP and self.state != ATTACK:
+        if self.state != JUMP and self.state != ATTACK and self.state != ROLL:
             if move_dir != 0:
                 self.state = RUN
             else:
                 self.state = IDLE
-
-        self.stage.apply_physics(self, dt, move_dir)
 
         if self.state == IDLE:
             self.tacc += dt
@@ -135,6 +154,22 @@ class Player:
                 self.frame = 0
                 self.tacc = 0.0
 
+        elif self.state == ROLL:
+            self.roll_tacc += dt
+            while self.roll_tacc >= 0.05:
+                self.roll_tacc -= 0.05
+                self.roll_frame += 1
+                if self.roll_frame >= len(self.data_roll['widths']):
+                    self.invincible = False
+                    if self.on_ground:
+                        self.state = RUN if move_dir != 0 else IDLE
+                        self.frame = 0
+                        self.tacc = 0.0
+                    else:
+                        self.state = JUMP
+                    self.roll_frame = 0
+                    break
+
         else:
             self.atk_tacc += dt
             while self.atk_tacc >= 0.045:
@@ -157,6 +192,11 @@ class Player:
                     self.atk_frame = 0
                     break
 
+        phys_dir = move_dir
+        if self.state == ROLL and phys_dir == 0:
+            phys_dir = self.dir
+        self.stage.apply_physics(self, dt, phys_dir)
+
         if self.slash_playing:
             self.slash_tacc += dt
             while self.slash_tacc >= 0.03:
@@ -177,14 +217,18 @@ class Player:
         elif self.state == JUMP:
             self.stage.draw_frame(self.img_jump, self.data_jump, self.jump_frame,
                                   self.x, self.y, self.char_scale, flip)
+        elif self.state == ROLL:
+            self.stage.draw_frame(self.img_roll, self.data_roll, self.roll_frame,
+                                  self.x, self.y - 5, self.char_scale, flip)
         else:
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
                                   self.x, self.y, self.char_scale, flip)
 
-        l, b, r, t = self.get_bb()
-        sx1, sy1 = self.stage.to_screen(l, b)
-        sx2, sy2 = self.stage.to_screen(r, t)
-        draw_rectangle(sx1, sy1, sx2, sy2)
+        if not self.invincible:
+            l, b, r, t = self.get_bb()
+            sx1, sy1 = self.stage.to_screen(l, b)
+            sx2, sy2 = self.stage.to_screen(r, t)
+            draw_rectangle(sx1, sy1, sx2, sy2)
 
         if self.state == ATTACK:
             l2, b2, r2, t2 = self.attack_hitbox()

@@ -49,6 +49,8 @@ def handle_events(events):
                 player.request_jump()
             elif e.key == SDLK_a:
                 player.request_attack()
+            elif e.key == SDLK_s:
+                player.request_roll()
         elif e.type == SDL_KEYUP:
             if e.key == SDLK_LEFT:
                 left_pressed = False
