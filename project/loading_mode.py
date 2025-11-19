@@ -1,7 +1,8 @@
 from pico2d import *
 import game_framework
-import stage1
 import stage0
+import stage1
+import stage2
 
 loading_image = None
 bgm = None
@@ -37,7 +38,7 @@ def handle_events(events):
                 mx = e.x
                 my = h - e.y - 1
 
-                left0 = int(w * 0.6)
+                left0 = int(w * 0.7)
                 right0 = int(w * 1.0)
                 bottom0 = int(h * 0.60)
                 top0 = int(h * 0.80)
@@ -45,7 +46,7 @@ def handle_events(events):
                     game_framework.change_state(stage0)
                     return
 
-                left1 = int(w * 0.6)
+                left1 = int(w * 0.7)
                 right1 = int(w * 1.0)
                 bottom1 = int(h * 0.30)
                 top1 = int(h * 0.50)
@@ -53,6 +54,13 @@ def handle_events(events):
                     game_framework.change_state(stage1)
                     return
 
+                left2 = int(w * 0.7)
+                right2 = int(w * 1.0)
+                bottom2 = int(h * 0.0)
+                top2 = int(h * 0.20)
+                if left2 <= mx <= right2 and bottom2 <= my <= top2:
+                    game_framework.change_state(stage2)
+                    return
 
 def update(dt):
     pass
@@ -65,16 +73,22 @@ def draw():
         h = get_canvas_height()
         loading_image.draw(w // 2, h // 2, w, h)
 
-        left0 = int(w * 0.6)
+        left0 = int(w * 0.7)
         right0 = int(w * 1.0)
         bottom0 = int(h * 0.60)
         top0 = int(h * 0.80)
         draw_rectangle(left0, bottom0, right0, top0)
 
-        left1 = int(w * 0.6)
+        left1 = int(w * 0.7)
         right1 = int(w * 1.0)
         bottom1 = int(h * 0.30)
         top1 = int(h * 0.50)
         draw_rectangle(left1, bottom1, right1, top1)
+
+        left2 = int(w * 0.7)
+        right2 = int(w * 1.0)
+        bottom2 = int(h * 0.0)
+        top2 = int(h * 0.20)
+        draw_rectangle(left2, bottom2, right2, top2)
 
     update_canvas()
