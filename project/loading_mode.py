@@ -1,6 +1,6 @@
 from pico2d import *
 import game_framework
-import play_mode
+import stage1
 import stage0
 
 loading_image = None
@@ -50,7 +50,8 @@ def handle_events(events):
                 bottom1 = int(h * 0.30)
                 top1 = int(h * 0.50)
                 if left1 <= mx <= right1 and bottom1 <= my <= top1:
-                    game_framework.change_state(play_mode)
+                    game_framework.change_state(stage1)
+                    return
 
 
 def update(dt):
