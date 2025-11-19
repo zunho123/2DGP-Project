@@ -18,6 +18,8 @@ def enter():
     stage = Stage('stage0.png', window_w=w, window_h=h, zoom=2.0, ground_px= -12.5)
     stage.platforms = [(0, stage.w, stage.ground_y)]
     player = Player(stage, scale=PLAYER_SCALE_STAGE0)
+    player.x = 1350
+    player.dir = -1
     move_dir = 0
     left_pressed = False
     right_pressed = False
