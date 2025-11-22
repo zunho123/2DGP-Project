@@ -13,6 +13,8 @@ up_hint = None
 can_use_elevator = False
 enemies = []
 elevator_used = False
+paused = True
+hint_font = None
 
 PLAYER_SCALE_STAGE0 = 1.5
 FIRST_FLOOR_GROUND = -12.5
@@ -28,7 +30,7 @@ SECOND_FLOOR_START_X = 80
 
 def enter():
     global stage, player, move_dir, left_pressed, right_pressed
-    global up_hint, can_use_elevator, enemies, elevator_used
+    global up_hint, can_use_elevator, enemies, elevator_used, paused, hint_font
 
     w = get_canvas_width()
     h = get_canvas_height()
@@ -40,6 +42,9 @@ def enter():
     player.x = FIRST_FLOOR_START_X
     player.dir = -1
 
+    target = stage.clamp(player.x - stage.vw * 0.5, 0, max(0, stage.w - stage.vw))
+    stage.cam_x = target
+
     move_dir = 0
     left_pressed = False
     right_pressed = False
@@ -49,26 +54,44 @@ def enter():
     enemies = []
     elevator_used = False
 
+    hint_font = load_font('neodgm.ttf', 20)
+    paused = True
+
 
 def exit():
-    global stage, player, up_hint, enemies, can_use_elevator, elevator_used
+    global stage, player, up_hint, enemies, can_use_elevator, elevator_used, hint_font, paused
     stage = None
     player = None
     up_hint = None
     enemies = []
     can_use_elevator = False
     elevator_used = False
+    hint_font = None
+    paused = True
 
 
 def handle_events(events):
-    global left_pressed, right_pressed
+    global left_pressed, right_pressed, paused
     for e in events:
         if e.type == SDL_QUIT:
             game_framework.quit()
         elif e.type == SDL_KEYDOWN:
             if e.key == SDLK_ESCAPE:
                 game_framework.quit()
-            elif e.key == SDLK_LEFT:
+
+            if paused:
+                if e.key == SDLK_LEFT:
+                    paused = False
+                    left_pressed = True
+                elif e.key == SDLK_RIGHT:
+                    paused = False
+                    right_pressed = True
+                elif e.key == SDLK_SPACE:
+                    paused = False
+                    player.request_jump()
+                return
+
+            if e.key == SDLK_LEFT:
                 left_pressed = True
             elif e.key == SDLK_RIGHT:
                 right_pressed = True
@@ -81,7 +104,10 @@ def handle_events(events):
             elif e.key == SDLK_UP:
                 if can_use_elevator:
                     move_to_second_floor()
+
         elif e.type == SDL_KEYUP:
+            if paused:
+                continue
             if e.key == SDLK_LEFT:
                 left_pressed = False
             elif e.key == SDLK_RIGHT:
@@ -119,12 +145,19 @@ def move_to_second_floor():
     player.on_ground = True
     player.dir = 1
 
+    target = stage.clamp(player.x - stage.vw * 0.5, 0, max(0, stage.w - stage.vw))
+    stage.cam_x = target
+
     can_use_elevator = False
     elevator_used = True
 
 
 def update(dt):
     global move_dir, can_use_elevator
+    if paused:
+        can_use_elevator = False
+        return
+
     move_dir = 0
     if left_pressed:
         move_dir -= 1
@@ -141,8 +174,16 @@ def draw():
     clear_canvas()
     stage.draw()
     player.draw()
+
     if can_use_elevator and up_hint is not None:
         sx, sy = stage.to_screen(player.x, player.y)
         size = 50
         up_hint.draw(sx, sy + 175, size, size)
+
+    if paused and hint_font is not None:
+        sx, sy = stage.to_screen(player.x, player.y)
+        hint_font.draw(sx - 100, sy + 230, '<- / -> : 이동', (255, 255, 255))
+        hint_font.draw(sx - 100, sy + 210, 'SPACE : 점프', (255, 255, 255))
+        hint_font.draw(sx - 100, sy + 190, '아무 키를 눌러 계속', (255, 255, 0))
+
     update_canvas()
