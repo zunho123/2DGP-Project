@@ -34,7 +34,7 @@ GROUND_TOLERANCE = 8
 SECOND_FLOOR_GROUND = 242
 SECOND_FLOOR_START_X = 80
 
-ATTACK_TUTORIAL_X = 1000
+ATTACK_TUTORIAL_X = 950
 ROLL_TUTORIAL_X = 650
 
 STAGE_CLEAR_WAIT = 2.0
@@ -132,10 +132,15 @@ def handle_events(events):
                     if e.key == SDLK_a:
                         paused = False
                         player.request_attack()
+                    return
                 elif tutorial_step == 2:
                     if e.key == SDLK_s:
                         paused = False
                         player.request_roll()
+                        for obj in enemies:
+                            if hasattr(obj, 'start_attack'):
+                                obj.start_attack(player.x, player.dir)
+                                break
                     return
 
             if e.key == SDLK_LEFT:
