@@ -1,4 +1,5 @@
 from pico2d import *
+from behavior_tree import BehaviorTree, Action, Sequence, Condition, Selector
 
 EN_IDLE, EN_RUN, EN_ATTACK, EN_DEAD = 0, 1, 2, 3
 
@@ -59,24 +60,81 @@ class Enemy:
         self.run_gap = 0.06
 
         self.atk_frame = 0
+        self.prev_atk_frame = 0
         self.atk_tacc = 0.0
-        self.atk_gap = 0.06
+        self.atk_gap = 0.08
 
         self.dead_frame = 0
         self.dead_tacc = 0.0
         self.dead_gap = 0.06
 
-        self.ai_attack_interval = 2.0
-        self.ai_attack_timer = 0.0
+        self.attack_range = 80.0
+        self.attack_cooldown = 1.0
+        self.attack_timer = 0.0
 
-        patrol_range = 140.0
-        left = self.x - patrol_range * 0.5
-        right = self.x + patrol_range * 0.5
-        self.patrol_left = max(40.0, left)
-        self.patrol_right = min(self.stage.w - 40.0, right)
+        self.chase_stop_dist = 40.0
 
-        self.idle_time = 0.0
-        self.idle_duration = 2.0
+        self.hit_this_swing = False
+        self.hit_flash_timer = 0.0
+
+        self.attack_start_delay_default = 0.15
+        self.attack_start_delay = 0.0
+
+        self.bt = self.build_behavior_tree()
+
+    def build_behavior_tree(self):
+        cond_in_range = Condition('player_in_range', self.is_player_in_attack_range)
+        act_attack = Action('attack', self.do_attack)
+        attack_seq = Sequence('attack_seq', [cond_in_range, act_attack])
+
+        act_chase = Action('chase_player', self.chase_player)
+
+        root = Selector('root', [attack_seq, act_chase])
+        return BehaviorTree(root)
+
+    def is_player_in_attack_range(self):
+        player = getattr(self.stage, 'player', None)
+        if player is None:
+            return False
+        dx = abs(player.x - self.x)
+        return dx <= self.attack_range
+
+    def do_attack(self):
+        if self.state not in (EN_IDLE, EN_RUN):
+            return BehaviorTree.FAIL
+        player = getattr(self.stage, 'player', None)
+        if player is not None:
+            dx = player.x - self.x
+            if dx != 0:
+                self.dir = 1 if dx > 0 else -1
+        self.start_attack()
+        return BehaviorTree.SUCCESS
+
+    def chase_player(self):
+        if self.state == EN_DEAD:
+            return BehaviorTree.FAIL
+
+        player = getattr(self.stage, 'player', None)
+        if player is None:
+            return BehaviorTree.FAIL
+
+        dx = player.x - self.x
+
+        if abs(dx) < self.chase_stop_dist:
+            if self.state == EN_RUN:
+                self.stop_run()
+            return BehaviorTree.SUCCESS
+
+        self.dir = 1 if dx > 0 else -1
+
+        if self.state != EN_RUN:
+            self.start_run()
+
+        return BehaviorTree.RUNNING
+
+    def handle_collision(self, group, other, hit):
+        if group == 'player:enemy' and hit:
+            self.die()
 
     def is_alive(self):
         return self.state != EN_DEAD
@@ -103,27 +161,87 @@ class Enemy:
     def get_bb(self):
         return self.aabb()
 
-    def start_run(self):
-        if self.state != EN_DEAD:
-            self.state = EN_RUN
-            self.run_frame = 0
-            self.run_tacc = 0.0
+    def is_intersect(self, aabb):
+        l1, b1, r1, t1 = self.aabb()
+        l2, b2, r2, t2 = aabb
+        if l1 > r2:
+            return False
+        if r1 < l2:
+            return False
+        if t1 < b2:
+            return False
+        if b1 > t2:
+            return False
+        return True
+
+    def attack_hitbox(self):
+        fw = 40.0 * self.char_scale
+        fh = 30.0 * self.char_scale
+        off_x = 20.0 * self.char_scale
+        off_y = 20.0 * self.char_scale
+        if self.dir == 1:
+            l = self.x + off_x
+            r = l + fw
+        else:
+            r = self.x - off_x
+            l = r - fw
+        b = self.y + off_y
+        t = b + fh
+        return l, b, r, t
+
+    def check_player_hit(self):
+        if self.hit_this_swing:
+            return
+        player = getattr(self.stage, 'player', None)
+        if player is None:
+            return
+        atk_l, atk_b, atk_r, atk_t = self.attack_hitbox()
+        pl_l, pl_b, pl_r, pl_t = player.get_bb()
+        if atk_l > pl_r:
+            return
+        if atk_r < pl_l:
+            return
+        if atk_t < pl_b:
+            return
+        if atk_b > pl_t:
+            return
+        self.hit_this_swing = True
+        self.hit_flash_timer = 0.2
+        setattr(player, 'last_hit_by_enemy', self)
 
     def stop_run(self):
         if self.state != EN_DEAD:
             self.state = EN_IDLE
             self.frame = 0
             self.tacc = 0.0
-            self.idle_time = 0.0
+
+    def start_run(self):
+        if self.state != EN_DEAD and self.state != EN_RUN:
+            self.state = EN_RUN
+            self.run_frame = 0
+            self.run_tacc = 0.0
 
     def start_attack(self):
         if self.state != EN_DEAD:
             self.state = EN_ATTACK
+            self.prev_atk_frame = 0
             self.atk_frame = 0
             self.atk_tacc = 0.0
+            self.hit_this_swing = False
+            self.attack_start_delay = self.attack_start_delay_default
 
     def update(self, dt):
         self.stage.apply_physics(self, dt, 0)
+
+        if self.attack_timer > 0.0:
+            self.attack_timer -= dt
+            if self.attack_timer < 0.0:
+                self.attack_timer = 0.0
+
+        if self.hit_flash_timer > 0.0:
+            self.hit_flash_timer -= dt
+            if self.hit_flash_timer < 0.0:
+                self.hit_flash_timer = 0.0
 
         if self.state == EN_DEAD:
             self.dead_tacc += dt
@@ -133,48 +251,44 @@ class Enemy:
                     self.dead_frame += 1
             return
 
-        self.ai_attack_timer += dt
-        if self.state in (EN_IDLE, EN_RUN) and self.ai_attack_timer >= self.ai_attack_interval:
-            self.start_attack()
-            self.ai_attack_timer = 0.0
+        if self.state in (EN_IDLE, EN_RUN) and self.attack_timer <= 0.0:
+            self.bt.run()
+        elif self.state in (EN_IDLE, EN_RUN):
+            self.chase_player()
 
         if self.state == EN_IDLE:
-            self.idle_time += dt
-
             self.tacc += dt
             while self.tacc >= self.gap:
                 self.tacc -= self.gap
                 self.frame = (self.frame + 1) % self.idle_cols
-
-            if self.idle_time >= self.idle_duration:
-                self.idle_time = 0.0
-                self.start_run()
 
         elif self.state == EN_RUN:
             self.run_tacc += dt
             while self.run_tacc >= self.run_gap:
                 self.run_tacc -= self.run_gap
                 self.run_frame = (self.run_frame + 1) % len(self.data_run['widths'])
-
             self.x += self.dir * self.speed * dt
 
-            if self.x < self.patrol_left:
-                self.x = self.patrol_left
-                self.dir = 1
-                self.stop_run()
-            elif self.x > self.patrol_right:
-                self.x = self.patrol_right
-                self.dir = -1
-                self.stop_run()
-
         elif self.state == EN_ATTACK:
+            if self.attack_start_delay > 0.0:
+                self.attack_start_delay -= dt
+                if self.attack_start_delay < 0.0:
+                    self.attack_start_delay = 0.0
+                return
+
             self.atk_tacc += dt
             while self.atk_tacc >= self.atk_gap:
                 self.atk_tacc -= self.atk_gap
+                self.prev_atk_frame = self.atk_frame
                 self.atk_frame += 1
+
+                if 2 <= self.atk_frame <= 4:
+                    self.check_player_hit()
+
                 if self.atk_frame >= len(self.data_attack['widths']):
                     self.atk_frame = 0
-                    self.start_run()
+                    self.attack_timer = self.attack_cooldown
+                    self.stop_run()
                     break
 
     def draw(self):
@@ -196,3 +310,9 @@ class Enemy:
         sx1, sy1 = self.stage.to_screen(l, b)
         sx2, sy2 = self.stage.to_screen(r, t)
         draw_rectangle(sx1, sy1, sx2, sy2)
+
+        if self.state == EN_ATTACK:
+            atk_l, atk_b, atk_r, atk_t = self.attack_hitbox()
+            ax1, ay1 = self.stage.to_screen(atk_l, atk_b)
+            ax2, ay2 = self.stage.to_screen(atk_r, atk_t)
+            draw_rectangle(ax1, ay1, ax2, ay2)
