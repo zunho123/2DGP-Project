@@ -1,7 +1,7 @@
 from pico2d import *
 from behavior_tree import BehaviorTree, Action, Sequence, Condition, Selector
 
-EN_IDLE, EN_RUN, EN_ATTACK, EN_DEAD = 0, 1, 2, 3
+EN_IDLE, EN_RUN, EN_ATTACK, EN_DEAD, EN_SPECIAL = 0, 1, 2, 3, 4
 
 
 class Enemy:
@@ -11,6 +11,8 @@ class Enemy:
         self.img_run = load_image('enemyrun.png')
         self.img_attack = load_image('enemyatt.png')
         self.img_dead = load_image('enemy_dead.png')
+        self.img_special = load_image('special.png')
+        self.img_special_slash = load_image('specialslash.png')
 
         self.idle_cols = 12
 
@@ -32,7 +34,13 @@ class Enemy:
             pad=0
         )
 
-        for d in (self.data_dead, self.data_run, self.data_attack):
+        self.data_special = dict(
+            lefts=[0, self.img_special.w // 2],
+            widths=[self.img_special.w // 2, self.img_special.w // 2],
+            pad=0
+        )
+
+        for d in (self.data_dead, self.data_run, self.data_attack, self.data_special):
             pad = d.get('pad', 0)
             eff = [max(1, w - 2 * pad) for w in d['widths']]
             d['aw'] = sum(eff) / len(eff)
@@ -79,6 +87,19 @@ class Enemy:
 
         self.attack_start_delay_default = 0.15
         self.attack_start_delay = 0.0
+
+        self.special_frame = 0
+        self.special_tacc = 0.0
+        self.special_delay_default = 0.5
+        self.special_delay = 0.0
+
+        self.special_dash_distance = 200.0
+        self.special_dash_left = 0.0
+        self.special_dash_speed = 800.0
+
+        self.special_slash_active = False
+        self.special_slash_x = 0.0
+        self.special_slash_y = 0.0
 
         self.bt = self.build_behavior_tree()
 
@@ -230,6 +251,25 @@ class Enemy:
             self.hit_this_swing = False
             self.attack_start_delay = self.attack_start_delay_default
 
+    def start_special_attack(self):
+        if self.state == EN_DEAD:
+            return
+        self.state = EN_SPECIAL
+        self.special_frame = 0
+        self.special_tacc = 0.0
+        self.special_delay = self.special_delay_default
+        self.special_dash_left = self.special_dash_distance
+
+        player = getattr(self.stage, 'player', None)
+        if player is not None:
+            self.special_slash_x = player.x
+            self.special_slash_y = player.y + self.ground_off + 35
+        else:
+            self.special_slash_x = self.x + self.dir * (self.special_dash_distance * 0.5)
+            self.special_slash_y = self.y
+
+        self.special_slash_active = True
+
     def update(self, dt):
         self.stage.apply_physics(self, dt, 0)
 
@@ -287,9 +327,31 @@ class Enemy:
 
                 if self.atk_frame >= len(self.data_attack['widths']):
                     self.atk_frame = 0
-                    self.attack_timer = self.attack_cooldown
-                    self.stop_run()
+                    self.start_special_attack()
                     break
+
+        elif self.state == EN_SPECIAL:
+            if self.special_delay > 0.0:
+                self.special_delay -= dt
+                if self.special_delay < 0.0:
+                    self.special_delay = 0.0
+                self.special_frame = 0
+                return
+
+            if self.special_dash_left > 0.0:
+                if self.special_frame == 0:
+                    self.special_frame = 1
+                    self.special_slash_active = False
+
+                move_step = self.special_dash_speed * dt
+                if move_step > self.special_dash_left:
+                    move_step = self.special_dash_left
+                self.special_dash_left -= move_step
+                self.x += self.dir * move_step
+            else:
+                self.special_dash_left = 0.0
+                self.attack_timer = self.attack_cooldown
+                self.stop_run()
 
     def draw(self):
         flip = (self.dir == -1)
@@ -301,6 +363,9 @@ class Enemy:
                                   self.x, self.y + 3, self.char_scale, flip)
         elif self.state == EN_ATTACK:
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
+                                  self.x, self.y, self.char_scale, flip)
+        elif self.state == EN_SPECIAL:
+            self.stage.draw_frame(self.img_special, self.data_special, self.special_frame,
                                   self.x, self.y, self.char_scale, flip)
         else:
             self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame,
@@ -316,3 +381,17 @@ class Enemy:
             ax1, ay1 = self.stage.to_screen(atk_l, atk_b)
             ax2, ay2 = self.stage.to_screen(atk_r, atk_t)
             draw_rectangle(ax1, ay1, ax2, ay2)
+
+        if self.special_slash_active:
+            sx, sy = self.stage.to_screen(self.special_slash_x, self.special_slash_y)
+            w = self.img_special_slash.w * self.char_scale
+            h = self.img_special_slash.h * self.char_scale
+            flip_flag = 'h' if self.dir == -1 else ''
+            self.img_special_slash.clip_composite_draw(
+                0, 0,
+                self.img_special_slash.w, self.img_special_slash.h,
+                0,
+                flip_flag,
+                sx, sy,
+                w, h
+            )
