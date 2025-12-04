@@ -48,15 +48,18 @@ class Player:
         self.ground_off = 0
         self.y = self.stage.ground_y + self.ground_off + 2
         self.dir = 1
+
         self.state = IDLE
         self.frame = 0
         self.jump_frame = 0
         self.atk_frame = 0
         self.prev_atk_frame = 0
+
         self.tacc = 0.0
         self.atk_tacc = 0.0
         self.roll_frame = 0
         self.roll_tacc = 0.0
+
         self.run_speed = 260.0
         self.gravity = -2000.0
         self.jump_vel = 520.0
@@ -70,6 +73,7 @@ class Player:
         self.slash_playing = False
 
         self.invincible = False
+        self.stage.player = self
 
     def request_jump(self):
         if self.on_ground and self.state not in (ATTACK, ROLL):
@@ -175,7 +179,7 @@ class Player:
                     self.roll_frame = 0
                     break
 
-        else:
+        else:  # ATTACK
             self.atk_tacc += dt
             while self.atk_tacc >= 0.045:
                 self.atk_tacc -= 0.045
@@ -208,19 +212,24 @@ class Player:
 
     def draw(self):
         flip = (self.dir == -1)
+
         if self.state == IDLE:
             self.stage.draw_frame(self.img_idle, self.data_idle, self.frame,
                                   self.x, self.y, self.char_scale, flip)
+
         elif self.state == RUN:
             self.stage.draw_frame(self.img_run, self.data_run, self.frame,
                                   self.x, self.y, self.char_scale, flip)
+
         elif self.state == JUMP:
             self.stage.draw_frame(self.img_jump, self.data_jump, self.jump_frame,
                                   self.x, self.y, self.char_scale, flip)
+
         elif self.state == ROLL:
             self.stage.draw_frame(self.img_roll, self.data_roll, self.roll_frame,
                                   self.x, self.y - 5, self.char_scale, flip)
-        else:
+
+        else:  # ATTACK
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
                                   self.x, self.y, self.char_scale, flip)
 
