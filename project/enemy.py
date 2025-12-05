@@ -3,7 +3,6 @@ from behavior_tree import BehaviorTree, Action, Sequence, Condition, Selector
 
 EN_IDLE, EN_RUN, EN_ATTACK, EN_DEAD, EN_SPECIAL = 0, 1, 2, 3, 4
 
-
 class Enemy:
     def __init__(self, stage, scale=1.0):
         self.stage = stage
@@ -89,17 +88,22 @@ class Enemy:
         self.attack_start_delay = 0.0
 
         self.special_frame = 0
+        self.special_phase = 0
         self.special_tacc = 0.0
-        self.special_delay_default = 0.5
-        self.special_delay = 0.0
 
-        self.special_dash_distance = 200.0
-        self.special_dash_left = 0.0
-        self.special_dash_speed = 800.0
+        self.special_prepare_time = 0.15
+        self.special_effect_time = 0.20
+        self.special_appear_time = 0.08
+        self.special_distance = 150.0
+
+        self.special_teleport_x = self.x
+        self.special_teleport_y = self.y
 
         self.special_slash_active = False
         self.special_slash_x = 0.0
         self.special_slash_y = 0.0
+
+        self.special_recovery = 0.0
 
         self.bt = self.build_behavior_tree()
 
@@ -107,9 +111,7 @@ class Enemy:
         cond_in_range = Condition('player_in_range', self.is_player_in_attack_range)
         act_attack = Action('attack', self.do_attack)
         attack_seq = Sequence('attack_seq', [cond_in_range, act_attack])
-
         act_chase = Action('chase_player', self.chase_player)
-
         root = Selector('root', [attack_seq, act_chase])
         return BehaviorTree(root)
 
@@ -134,23 +136,17 @@ class Enemy:
     def chase_player(self):
         if self.state == EN_DEAD:
             return BehaviorTree.FAIL
-
         player = getattr(self.stage, 'player', None)
         if player is None:
             return BehaviorTree.FAIL
-
         dx = player.x - self.x
-
         if abs(dx) < self.chase_stop_dist:
             if self.state == EN_RUN:
                 self.stop_run()
             return BehaviorTree.SUCCESS
-
         self.dir = 1 if dx > 0 else -1
-
         if self.state != EN_RUN:
             self.start_run()
-
         return BehaviorTree.RUNNING
 
     def handle_collision(self, group, other, hit):
@@ -185,14 +181,10 @@ class Enemy:
     def is_intersect(self, aabb):
         l1, b1, r1, t1 = self.aabb()
         l2, b2, r2, t2 = aabb
-        if l1 > r2:
-            return False
-        if r1 < l2:
-            return False
-        if t1 < b2:
-            return False
-        if b1 > t2:
-            return False
+        if l1 > r2: return False
+        if r1 < l2: return False
+        if t1 < b2: return False
+        if b1 > t2: return False
         return True
 
     def attack_hitbox(self):
@@ -218,17 +210,22 @@ class Enemy:
             return
         atk_l, atk_b, atk_r, atk_t = self.attack_hitbox()
         pl_l, pl_b, pl_r, pl_t = player.get_bb()
-        if atk_l > pl_r:
-            return
-        if atk_r < pl_l:
-            return
-        if atk_t < pl_b:
-            return
-        if atk_b > pl_t:
-            return
+        if atk_l > pl_r: return
+        if atk_r < pl_l: return
+        if atk_t < pl_b: return
+        if atk_b > pl_t: return
         self.hit_this_swing = True
         self.hit_flash_timer = 0.2
         setattr(player, 'last_hit_by_enemy', self)
+
+    def check_special_hit(self):
+        player = getattr(self.stage, 'player', None)
+        if player is None:
+            return
+        if not player.is_vulnerable():
+            return
+        setattr(player, 'last_hit_by_enemy', self)
+        player.hit_flash_timer = 0.2
 
     def stop_run(self):
         if self.state != EN_DEAD:
@@ -256,22 +253,38 @@ class Enemy:
             return
         self.state = EN_SPECIAL
         self.special_frame = 0
+        self.special_phase = 0
         self.special_tacc = 0.0
-        self.special_delay = self.special_delay_default
-        self.special_dash_left = self.special_dash_distance
+
+        base_x = self.x
+        teleport_x = base_x + self.dir * self.special_distance
+        teleport_x = max(20, min(self.stage.w - 20, teleport_x))
+        self.special_teleport_x = teleport_x
+        self.special_teleport_y = self.y
 
         player = getattr(self.stage, 'player', None)
         if player is not None:
             self.special_slash_x = player.x
             self.special_slash_y = player.y + self.ground_off + 35
         else:
-            self.special_slash_x = self.x + self.dir * (self.special_dash_distance * 0.5)
-            self.special_slash_y = self.y
+            self.special_slash_x = self.x + self.dir * (self.special_distance * 0.5)
+            self.special_slash_y = self.y + 35
 
-        self.special_slash_active = True
+        self.special_slash_active = False
 
     def update(self, dt):
         self.stage.apply_physics(self, dt, 0)
+
+        if self.special_recovery > 0.0:
+            self.special_recovery -= dt
+            if self.special_recovery < 0:
+                self.special_recovery = 0
+            self.state = EN_IDLE
+            self.tacc += dt
+            while self.tacc >= self.gap:
+                self.tacc -= self.gap
+                self.frame = (self.frame + 1) % self.idle_cols
+            return
 
         if self.attack_timer > 0.0:
             self.attack_timer -= dt
@@ -331,33 +344,36 @@ class Enemy:
                     break
 
         elif self.state == EN_SPECIAL:
-            if self.special_delay > 0.0:
-                self.special_delay -= dt
-                if self.special_delay < 0.0:
-                    self.special_delay = 0.0
-                self.special_frame = 0
-                return
+            self.special_tacc += dt
 
-            if self.special_dash_left > 0.0:
-                if self.special_frame == 0:
-                    self.special_frame = 1
+            if self.special_phase == 0:
+                if self.special_tacc >= self.special_prepare_time:
+                    self.special_tacc = 0.0
+                    self.special_phase = 1
+                    self.special_slash_active = True
+                    self.check_special_hit()
+
+            elif self.special_phase == 1:
+                if self.special_tacc >= self.special_effect_time:
+                    self.special_tacc = 0.0
+                    self.special_phase = 2
                     self.special_slash_active = False
+                    self.special_frame = 1
+                    self.x = self.special_teleport_x
+                    self.y = self.special_teleport_y
 
-                move_step = self.special_dash_speed * dt
-                if move_step > self.special_dash_left:
-                    move_step = self.special_dash_left
-                self.special_dash_left -= move_step
-                self.x += self.dir * move_step
             else:
-                self.special_dash_left = 0.0
-                self.attack_timer = self.attack_cooldown
-                self.stop_run()
+                if self.special_tacc >= self.special_appear_time:
+                    self.special_tacc = 0.0
+                    self.attack_timer = self.attack_cooldown
+                    self.stop_run()
+                    self.special_recovery = 1.0
 
     def draw(self):
         flip = (self.dir == -1)
         if self.state == EN_IDLE:
             self.stage.draw_strip(self.img_idle, self.idle_cols, self.frame,
-                                  self.x, self.y, self.char_scale, flip, pad=0)
+                                  self.x, self.y, self.char_scale, flip)
         elif self.state == EN_RUN:
             self.stage.draw_frame(self.img_run, self.data_run, self.run_frame,
                                   self.x, self.y + 3, self.char_scale, flip)
@@ -365,8 +381,15 @@ class Enemy:
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
                                   self.x, self.y, self.char_scale, flip)
         elif self.state == EN_SPECIAL:
-            self.stage.draw_frame(self.img_special, self.data_special, self.special_frame,
-                                  self.x, self.y, self.char_scale, flip)
+            if self.special_phase == 0:
+                idx = 0
+            elif self.special_phase == 2:
+                idx = 1
+            else:
+                idx = None
+            if idx is not None:
+                self.stage.draw_frame(self.img_special, self.data_special, idx,
+                                      self.x, self.y, self.char_scale, flip)
         else:
             self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame,
                                   self.x, self.y, self.char_scale, False)
