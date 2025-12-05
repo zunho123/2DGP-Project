@@ -1,7 +1,9 @@
 from pico2d import *
 from behavior_tree import BehaviorTree, Action, Sequence, Condition, Selector
+import random
 
 EN_IDLE, EN_RUN, EN_ATTACK, EN_DEAD, EN_SPECIAL = 0, 1, 2, 3, 4
+
 
 class Enemy:
     def __init__(self, stage, scale=1.0):
@@ -91,9 +93,9 @@ class Enemy:
         self.special_phase = 0
         self.special_tacc = 0.0
 
-        self.special_prepare_time = 0.15
-        self.special_effect_time = 0.20
-        self.special_appear_time = 0.08
+        self.special_prepare_time = 0.25
+        self.special_effect_time = 0.35
+        self.special_appear_time = 0.15
         self.special_distance = 150.0
 
         self.special_teleport_x = self.x
@@ -104,15 +106,47 @@ class Enemy:
         self.special_slash_y = 0.0
 
         self.special_recovery = 0.0
+        self.special_hit_done = False
+
+        self.special_interval_min = 10.0
+        self.special_interval_max = 20.0
+        self.special_timer = 0.0
+        self.special_interval = 0.0
+
+        self.reset_special_cooldown()
 
         self.bt = self.build_behavior_tree()
 
+    def reset_special_cooldown(self):
+        self.special_timer = 0.0
+        self.special_interval = random.uniform(self.special_interval_min, self.special_interval_max)
+
+    def is_special_ready(self):
+        if self.state not in (EN_IDLE, EN_RUN):
+            return False
+        if self.special_recovery > 0.0:
+            return False
+        return self.special_timer >= self.special_interval
+
+    def do_special(self):
+        if not self.is_special_ready():
+            return BehaviorTree.FAIL
+        self.start_special_attack()
+        self.reset_special_cooldown()
+        return BehaviorTree.SUCCESS
+
     def build_behavior_tree(self):
+        cond_special_ready = Condition('special_ready', self.is_special_ready)
+        act_special = Action('do_special', self.do_special)
+        special_seq = Sequence('special_seq', [cond_special_ready, act_special])
+
         cond_in_range = Condition('player_in_range', self.is_player_in_attack_range)
         act_attack = Action('attack', self.do_attack)
         attack_seq = Sequence('attack_seq', [cond_in_range, act_attack])
+
         act_chase = Action('chase_player', self.chase_player)
-        root = Selector('root', [attack_seq, act_chase])
+
+        root = Selector('root', [special_seq, attack_seq, act_chase])
         return BehaviorTree(root)
 
     def is_player_in_attack_range(self):
@@ -181,10 +215,14 @@ class Enemy:
     def is_intersect(self, aabb):
         l1, b1, r1, t1 = self.aabb()
         l2, b2, r2, t2 = aabb
-        if l1 > r2: return False
-        if r1 < l2: return False
-        if t1 < b2: return False
-        if b1 > t2: return False
+        if l1 > r2:
+            return False
+        if r1 < l2:
+            return False
+        if t1 < b2:
+            return False
+        if b1 > t2:
+            return False
         return True
 
     def attack_hitbox(self):
@@ -210,10 +248,14 @@ class Enemy:
             return
         atk_l, atk_b, atk_r, atk_t = self.attack_hitbox()
         pl_l, pl_b, pl_r, pl_t = player.get_bb()
-        if atk_l > pl_r: return
-        if atk_r < pl_l: return
-        if atk_t < pl_b: return
-        if atk_b > pl_t: return
+        if atk_l > pl_r:
+            return
+        if atk_r < pl_l:
+            return
+        if atk_t < pl_b:
+            return
+        if atk_b > pl_t:
+            return
         self.hit_this_swing = True
         self.hit_flash_timer = 0.2
         setattr(player, 'last_hit_by_enemy', self)
@@ -256,13 +298,13 @@ class Enemy:
         self.special_phase = 0
         self.special_tacc = 0.0
 
-        base_x = self.x
-        teleport_x = base_x + self.dir * self.special_distance
+        player = getattr(self.stage, 'player', None)
+
+        teleport_x = self.x + self.dir * 150.0
         teleport_x = max(20, min(self.stage.w - 20, teleport_x))
         self.special_teleport_x = teleport_x
         self.special_teleport_y = self.y
 
-        player = getattr(self.stage, 'player', None)
         if player is not None:
             self.special_slash_x = player.x
             self.special_slash_y = player.y + self.ground_off + 35
@@ -271,9 +313,13 @@ class Enemy:
             self.special_slash_y = self.y + 35
 
         self.special_slash_active = False
+        self.special_hit_done = False
 
     def update(self, dt):
         self.stage.apply_physics(self, dt, 0)
+
+        if self.state != EN_DEAD:
+            self.special_timer += dt
 
         if self.special_recovery > 0.0:
             self.special_recovery -= dt
@@ -340,7 +386,8 @@ class Enemy:
 
                 if self.atk_frame >= len(self.data_attack['widths']):
                     self.atk_frame = 0
-                    self.start_special_attack()
+                    self.state = EN_IDLE
+                    self.attack_timer = self.attack_cooldown
                     break
 
         elif self.state == EN_SPECIAL:
@@ -351,9 +398,12 @@ class Enemy:
                     self.special_tacc = 0.0
                     self.special_phase = 1
                     self.special_slash_active = True
-                    self.check_special_hit()
 
             elif self.special_phase == 1:
+                if not self.special_hit_done:
+                    self.check_special_hit()
+                    self.special_hit_done = True
+
                 if self.special_tacc >= self.special_effect_time:
                     self.special_tacc = 0.0
                     self.special_phase = 2
