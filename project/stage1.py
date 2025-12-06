@@ -3,7 +3,7 @@ import game_framework
 import stage1_mode
 from stage import Stage
 from player import Player, DEAD
-from enemy import Enemy
+from enemy import Enemy, EN_SPECIAL
 from kill_effect import KillSlashEffect
 
 stage = None
@@ -16,6 +16,7 @@ bgm = None
 hint_font = None
 effects = []
 boss_hp_font = None
+warning_img = None
 
 TRIGGER_X_MAX = 120
 PROMPT_SIZE = 56
@@ -36,7 +37,7 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next, bgm, effects
-    global game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font
+    global game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font, warning_img
     global player_attack_active_prev, enemy_damaged_this_attack
     stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
@@ -52,6 +53,7 @@ def enter():
     restart_font = load_font('neodgm.ttf', RESTART_FONT_SIZE)
     hint_font = load_font('neodgm.ttf', 24)
     boss_hp_font = load_font('neodgm.ttf', 20)
+    warning_img = load_image('warning.png')
     death_count = 0
     tutorial_paused = True
     last_player_state = player.state
@@ -60,7 +62,7 @@ def enter():
 
 
 def exit():
-    global bgm, game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font
+    global bgm, game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font, warning_img
     global player_attack_active_prev, enemy_damaged_this_attack
     if bgm is not None:
         bgm.stop()
@@ -74,7 +76,7 @@ def exit():
     boss_hp_font = None
     player_attack_active_prev = False
     enemy_damaged_this_attack = False
-
+    warning_img = None
 
 def restart_play():
     global move_dir, last_player_state, player_attack_active_prev, enemy_damaged_this_attack
@@ -220,6 +222,13 @@ def draw():
     for eff in effects:
         eff.draw()
     player.draw()
+
+    if warning_img is not None and enemy is not None and player is not None:
+        if hasattr(enemy, 'state') and enemy.state == EN_SPECIAL:
+            sx, sy = stage.to_screen(player.x, player.y)
+            wy = sy + int(80 * stage.zoom)
+            warning_img.draw(sx, wy, 96, 96)
+
     if can_enter_next and up_hint is not None:
         sx, sy = stage.to_screen(player.x, player.y)
         up_hint.draw(sx, sy + int(80 * stage.zoom), PROMPT_SIZE, PROMPT_SIZE)

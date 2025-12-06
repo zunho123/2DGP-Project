@@ -59,7 +59,7 @@ class Enemy:
         self.on_ground = True
 
         self.state = EN_RUN
-        self.max_hp = 20
+        self.max_hp = 30
         self.hp = self.max_hp
 
         self.frame = 0
@@ -110,8 +110,14 @@ class Enemy:
         self.special_recovery = 0.0
         self.special_hit_done = False
 
-        self.special_interval_min = 10.0
-        self.special_interval_max = 20.0
+        self.slash_img = load_image('slash.png')
+        self.slash_cols = 5
+        self.slash_frame = 0
+        self.slash_tacc = 0.0
+        self.slash_playing = False
+
+        self.special_interval_min = 9.0
+        self.special_interval_max = 13.0
         self.special_timer = 0.0
         self.special_interval = 0.0
 
@@ -307,6 +313,7 @@ class Enemy:
             self.atk_frame = 0
             self.atk_tacc = 0.0
             self.hit_this_swing = False
+            self.slash_playing = False
             self.attack_start_delay = self.attack_start_delay_default
 
     def start_special_attack(self):
@@ -361,6 +368,15 @@ class Enemy:
             if self.hit_flash_timer < 0.0:
                 self.hit_flash_timer = 0.0
 
+        if self.slash_playing:
+            self.slash_tacc += dt
+            while self.slash_tacc >= 0.03:
+                self.slash_tacc -= 0.03
+                self.slash_frame += 1
+                if self.slash_frame >= self.slash_cols:
+                    self.slash_playing = False
+                    break
+
         if self.state == EN_DEAD:
             self.dead_tacc += dt
             while self.dead_tacc >= self.dead_gap:
@@ -399,6 +415,11 @@ class Enemy:
                 self.atk_tacc -= self.atk_gap
                 self.prev_atk_frame = self.atk_frame
                 self.atk_frame += 1
+
+                if self.prev_atk_frame < 2 <= self.atk_frame:
+                    self.slash_playing = True
+                    self.slash_frame = 0
+                    self.slash_tacc = 0.0
 
                 if 2 <= self.atk_frame <= 4:
                     self.check_player_hit()
@@ -473,6 +494,22 @@ class Enemy:
             ax1, ay1 = self.stage.to_screen(atk_l, atk_b)
             ax2, ay2 = self.stage.to_screen(atk_r, atk_t)
             draw_rectangle(ax1, ay1, ax2, ay2)
+
+        if self.slash_playing:
+            offset_x = 20.0 * self.char_scale * self.dir
+            offset_y = 26.0 * self.char_scale
+            ex = self.x + offset_x
+            ey = self.y + offset_y
+            self.stage.draw_strip(
+                self.slash_img,
+                self.slash_cols,
+                self.slash_frame,
+                ex,
+                ey,
+                self.char_scale,
+                flip=(self.dir == -1),
+                pad=0
+            )
 
         if self.special_slash_active:
             sx, sy = self.stage.to_screen(self.special_slash_x, self.special_slash_y)
