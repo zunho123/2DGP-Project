@@ -1,6 +1,6 @@
 from pico2d import *
 
-IDLE, RUN, JUMP, ATTACK, ROLL = 0, 1, 2, 3, 4
+IDLE, RUN, JUMP, ATTACK, ROLL, DEAD = 0, 1, 2, 3, 4, 5
 
 
 class Player:
@@ -11,6 +11,7 @@ class Player:
         self.img_jump = load_image('jump.png')
         self.img_attack = load_image('attack.png')
         self.img_roll = load_image('rolling.png')
+        self.img_dead = load_image('player_dead.png')
 
         self.data_idle = dict(
             lefts=[8, 45, 84, 123, 162, 202, 242, 282, 321, 360],
@@ -37,8 +38,14 @@ class Player:
             widths=[47, 37, 36, 37, 40, 46, 43],
             pad=0
         )
+        self.data_dead = dict(
+            lefts=[11, 54, 111, 163, 218, 271, 325, 373, 435, 494, 552, 609],
+            widths=[38, 33, 47, 50, 48, 47, 43, 57, 55, 53, 52, 54],
+            pad=1
+        )
 
-        for d in (self.data_idle, self.data_run, self.data_jump, self.data_attack, self.data_roll):
+        for d in (self.data_idle, self.data_run, self.data_jump,
+                  self.data_attack, self.data_roll, self.data_dead):
             pad = d.get('pad', 0)
             eff = [max(1, w - 2 * pad) for w in d['widths']]
             d['aw'] = sum(eff) / len(eff)
@@ -59,6 +66,9 @@ class Player:
         self.atk_tacc = 0.0
         self.roll_frame = 0
         self.roll_tacc = 0.0
+        self.dead_frame = 0
+        self.dead_tacc = 0.0
+        self.dead_gap = 0.06
 
         self.run_speed = 260.0
         self.gravity = -2000.0
@@ -73,9 +83,13 @@ class Player:
         self.slash_playing = False
 
         self.invincible = False
+        self.hit_flash_timer = 0.0
+        self.last_hit_by_enemy = None
         self.stage.player = self
 
     def request_jump(self):
+        if self.state == DEAD:
+            return
         if self.on_ground and self.state not in (ATTACK, ROLL):
             self.state = JUMP
             self.vy = self.jump_vel
@@ -83,6 +97,8 @@ class Player:
             self.tacc = 0.0
 
     def request_attack(self):
+        if self.state == DEAD:
+            return
         if self.state not in (ATTACK, ROLL):
             self.state = ATTACK
             self.prev_atk_frame = 0
@@ -91,6 +107,8 @@ class Player:
             self.slash_playing = False
 
     def request_roll(self):
+        if self.state == DEAD:
+            return
         if self.on_ground and (self.state == IDLE or self.state == RUN):
             self.state = ROLL
             self.roll_frame = 0
@@ -126,7 +144,30 @@ class Player:
     def is_vulnerable(self):
         return not self.invincible
 
+    def die(self):
+        if self.state == DEAD:
+            return
+        self.state = DEAD
+        self.dead_frame = 0
+        self.dead_tacc = 0.0
+        self.vy = 0.0
+        self.invincible = False
+        self.slash_playing = False
+
     def update(self, dt, move_dir=0):
+        if self.state == DEAD:
+            self.stage.apply_physics(self, dt, 0)
+            if self.hit_flash_timer > 0.0:
+                self.hit_flash_timer -= dt
+                if self.hit_flash_timer < 0.0:
+                    self.hit_flash_timer = 0.0
+            self.dead_tacc += dt
+            while self.dead_tacc >= self.dead_gap:
+                self.dead_tacc -= self.dead_gap
+                if self.dead_frame < len(self.data_dead['widths']) - 1:
+                    self.dead_frame += 1
+            return
+
         if move_dir != 0:
             self.dir = 1 if move_dir > 0 else -1
 
@@ -179,7 +220,7 @@ class Player:
                     self.roll_frame = 0
                     break
 
-        else:  # ATTACK
+        else:
             self.atk_tacc += dt
             while self.atk_tacc >= 0.045:
                 self.atk_tacc -= 0.045
@@ -210,6 +251,12 @@ class Player:
                     self.slash_playing = False
                     break
 
+        if self.hit_flash_timer > 0.0:
+            self.hit_flash_timer -= dt
+            if self.hit_flash_timer < 0.0:
+                self.hit_flash_timer = 0.0
+
+
     def draw(self):
         flip = (self.dir == -1)
 
@@ -229,11 +276,15 @@ class Player:
             self.stage.draw_frame(self.img_roll, self.data_roll, self.roll_frame,
                                   self.x, self.y - 5, self.char_scale, flip)
 
+        elif self.state == DEAD:
+            self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame,
+                                  self.x, self.y, self.char_scale, flip)
+
         else:  # ATTACK
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
                                   self.x, self.y, self.char_scale, flip)
 
-        if not self.invincible:
+        if not self.invincible and self.state != DEAD:
             l, b, r, t = self.get_bb()
             sx1, sy1 = self.stage.to_screen(l, b)
             sx2, sy2 = self.stage.to_screen(r, t)
@@ -260,3 +311,4 @@ class Player:
                 flip=(self.dir == -1),
                 pad=0
             )
+
