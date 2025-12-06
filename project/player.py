@@ -152,7 +152,7 @@ class Player:
         return l, b, r, t
 
     def is_vulnerable(self):
-        return not self.invincible
+        return (not self.invincible) and self.state not in (DEAD, STAND)
 
     def die(self):
         if self.state == DEAD:
