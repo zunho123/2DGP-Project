@@ -280,7 +280,7 @@ class Player:
             self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame,
                                   self.x, self.y, self.char_scale, flip)
 
-        else:  # ATTACK
+        else: 
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
                                   self.x, self.y, self.char_scale, flip)
 
