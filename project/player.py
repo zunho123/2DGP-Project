@@ -324,18 +324,6 @@ class Player:
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
                                   self.x, self.y, self.char_scale, flip)
 
-        if not self.invincible and self.state not in (DEAD, STAND):
-            l, b, r, t = self.get_bb()
-            sx1, sy1 = self.stage.to_screen(l, b)
-            sx2, sy2 = self.stage.to_screen(r, t)
-            draw_rectangle(sx1, sy1, sx2, sy2)
-
-        if self.state == ATTACK:
-            l2, b2, r2, t2 = self.attack_hitbox()
-            ax1, ay1 = self.stage.to_screen(l2, b2)
-            ax2, ay2 = self.stage.to_screen(r2, t2)
-            draw_rectangle(ax1, ay1, ax2, ay2)
-
         if self.slash_playing:
             offset_x = 20.0 * self.char_scale * self.dir
             offset_y = 26.0 * self.char_scale

@@ -484,17 +484,6 @@ class Enemy:
             self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame,
                                   self.x, self.y, self.char_scale, False)
 
-        l, b, r, t = self.get_bb()
-        sx1, sy1 = self.stage.to_screen(l, b)
-        sx2, sy2 = self.stage.to_screen(r, t)
-        draw_rectangle(sx1, sy1, sx2, sy2)
-
-        if self.state == EN_ATTACK:
-            atk_l, atk_b, atk_r, atk_t = self.attack_hitbox()
-            ax1, ay1 = self.stage.to_screen(atk_l, atk_b)
-            ax2, ay2 = self.stage.to_screen(atk_r, atk_t)
-            draw_rectangle(ax1, ay1, ax2, ay2)
-
         if self.slash_playing:
             offset_x = 20.0 * self.char_scale * self.dir
             offset_y = 26.0 * self.char_scale

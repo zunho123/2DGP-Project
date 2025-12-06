@@ -77,18 +77,15 @@ def draw():
         right0 = int(w * 1.0)
         bottom0 = int(h * 0.60)
         top0 = int(h * 0.80)
-        draw_rectangle(left0, bottom0, right0, top0)
 
         left1 = int(w * 0.7)
         right1 = int(w * 1.0)
         bottom1 = int(h * 0.30)
         top1 = int(h * 0.50)
-        draw_rectangle(left1, bottom1, right1, top1)
 
         left2 = int(w * 0.7)
         right2 = int(w * 1.0)
         bottom2 = int(h * 0.0)
         top2 = int(h * 0.20)
-        draw_rectangle(left2, bottom2, right2, top2)
 
     update_canvas()

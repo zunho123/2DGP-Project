@@ -242,7 +242,6 @@ def draw():
             right = box_x + box_w // 2
             bottom = box_y - box_h // 2
             top = box_y + box_h // 2
-            draw_rectangle(left, bottom, right, top)
             boss_hp_font.draw(left + 10, box_y - 10, text, (255, 0, 0))
 
     for eff in effects:
@@ -272,7 +271,6 @@ def draw():
             right = cx + box_w // 2
             bottom = cy - box_h // 2
             top = cy + box_h // 2
-            draw_rectangle(left, bottom, right, top)
             hint_font.draw(left + 100, cy + 390, '보스를 공격해도 그의 공격은 끊기지 않습니다.', (255, 255, 255))
             hint_font.draw(left + 100, cy + 360, '타이밍을 잘 잡으세요.', (255, 255, 255))
             hint_font.draw(left + 100, cy + 330, '아무 키를 눌러 계속', (255, 255, 0))
@@ -307,8 +305,6 @@ def draw():
                 right = cx + box_w // 2
                 bottom = restart_y + RESTART_FONT_SIZE + 10
                 top = bottom + box_h
-                draw_rectangle(left, bottom, right, top)
-
                 phase = death_count % 4
                 if phase == 1:
                     msg1 = '보스의 공격은 엇박자로 이루어집니다.'
