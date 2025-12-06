@@ -41,6 +41,9 @@ def handle_events(events):
         elif e.type == SDL_KEYDOWN:
             if e.key == SDLK_ESCAPE:
                 game_framework.quit()
+            elif e.key == SDLK_q:
+                game_framework.change_to_loading()
+                return
             elif e.key == SDLK_LEFT:
                 left_pressed = True
             elif e.key == SDLK_RIGHT:
@@ -56,6 +59,7 @@ def handle_events(events):
                 left_pressed = False
             elif e.key == SDLK_RIGHT:
                 right_pressed = False
+
 
 def update(dt):
     global move_dir

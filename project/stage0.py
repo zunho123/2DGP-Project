@@ -122,6 +122,9 @@ def handle_events(events):
         elif e.type == SDL_KEYDOWN:
             if e.key == SDLK_ESCAPE:
                 game_framework.quit()
+            elif e.key == SDLK_q:
+                game_framework.change_to_loading()
+                return
 
             if paused:
                 if tutorial_step == 0:
@@ -283,6 +286,11 @@ def draw():
         e.draw()
     player.draw()
 
+    if hint_font is not None:
+        w = get_canvas_width()
+        h = get_canvas_height()
+        hint_font.draw(10, h - 30, 'q : 로딩 화면 전환', (255, 255, 255))
+
     if can_use_elevator and up_hint is not None:
         sx, sy = stage.to_screen(player.x, player.y)
         size = 50
@@ -311,3 +319,4 @@ def draw():
         stage_clear_font.draw(cx - approx_half, cy, text, (255, 255, 0))
 
     update_canvas()
+

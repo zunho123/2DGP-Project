@@ -27,6 +27,10 @@ def change_state(next_state):
     state = next_state
     state.enter()
 
+def change_to_loading():
+    import loading_mode
+    change_state(loading_mode)
+
 def quit():
     global running
     running = False

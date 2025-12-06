@@ -13,6 +13,7 @@ move_dir = 0
 up_hint = None
 can_enter_next = False
 bgm = None
+hint_font = None
 effects = []
 
 TRIGGER_X_MAX = 120
@@ -34,7 +35,7 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next, bgm, effects
-    global game_over_font, restart_font
+    global game_over_font, restart_font, hint_font
     stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
@@ -47,15 +48,24 @@ def enter():
     bgm.repeat_play()
     game_over_font = load_font('neodgm.ttf', GAME_OVER_FONT_SIZE)
     restart_font = load_font('neodgm.ttf', RESTART_FONT_SIZE)
+    hint_font = load_font('neodgm.ttf', 20)
 
 
 def exit():
-    global bgm, game_over_font, restart_font
+    global stage, player, enemy, up_hint, bgm, effects
+    global game_over_font, restart_font, hint_font
+
     if bgm is not None:
         bgm.stop()
+    stage = None
+    player = None
+    enemy = None
+    up_hint = None
     bgm = None
+    effects = []
     game_over_font = None
     restart_font = None
+    hint_font = None
 
 
 def restart_play():
@@ -78,6 +88,9 @@ def handle_events(events):
         elif e.type == SDL_KEYDOWN:
             if e.key == SDLK_ESCAPE:
                 game_framework.quit()
+            elif e.key == SDLK_q:
+                game_framework.change_to_loading()
+                return
 
             if player is not None and player.state == DEAD:
                 if hasattr(player, 'dead_time') and player.dead_time >= RESTART_DELAY:
@@ -105,6 +118,7 @@ def handle_events(events):
                 move_dir += 1
             elif e.key == SDLK_RIGHT:
                 move_dir -= 1
+
 
 def _enemy_dead():
     if enemy is None:
@@ -154,6 +168,11 @@ def draw():
         sx, sy = stage.to_screen(player.x, player.y)
         up_hint.draw(sx, sy + int(80 * stage.zoom), PROMPT_SIZE, PROMPT_SIZE)
 
+    if hint_font is not None:
+        w = get_canvas_width()
+        h = get_canvas_height()
+        hint_font.draw(10, h - 30, 'q : 로딩 화면 전환', (255, 255, 255))
+
     if player is not None and hasattr(player, 'dead_time') and player.state == DEAD:
         if game_over_font is not None and player.dead_time >= GAME_OVER_DELAY:
             w = get_canvas_width()
@@ -177,3 +196,4 @@ def draw():
                               text2)
 
     update_canvas()
+
