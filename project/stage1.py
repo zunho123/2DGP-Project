@@ -15,6 +15,7 @@ can_enter_next = False
 bgm = None
 hint_font = None
 effects = []
+boss_hp_font = None
 
 TRIGGER_X_MAX = 120
 PROMPT_SIZE = 56
@@ -35,7 +36,8 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next, bgm, effects
-    global game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font
+    global game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font
+    global player_attack_active_prev, enemy_damaged_this_attack
     stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
@@ -49,14 +51,17 @@ def enter():
     game_over_font = load_font('neodgm.ttf', GAME_OVER_FONT_SIZE)
     restart_font = load_font('neodgm.ttf', RESTART_FONT_SIZE)
     hint_font = load_font('neodgm.ttf', 24)
+    boss_hp_font = load_font('neodgm.ttf', 20)
     death_count = 0
     tutorial_paused = True
     last_player_state = player.state
-
+    player_attack_active_prev = False
+    enemy_damaged_this_attack = False
 
 
 def exit():
-    global bgm, game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font
+    global bgm, game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font
+    global player_attack_active_prev, enemy_damaged_this_attack
     if bgm is not None:
         bgm.stop()
     bgm = None
@@ -66,10 +71,13 @@ def exit():
     death_count = 0
     tutorial_paused = False
     last_player_state = None
+    boss_hp_font = None
+    player_attack_active_prev = False
+    enemy_damaged_this_attack = False
 
 
 def restart_play():
-    global move_dir, last_player_state
+    global move_dir, last_player_state, player_attack_active_prev, enemy_damaged_this_attack
     if player is None or stage is None:
         return
     player.start_stand()
@@ -79,6 +87,8 @@ def restart_play():
     player.hit_flash_timer = 0.0
     move_dir = 0
     last_player_state = player.state
+    player_attack_active_prev = False
+    enemy_damaged_this_attack = False
 
 
 def handle_events(events):
@@ -97,7 +107,7 @@ def handle_events(events):
 
             if tutorial_paused:
                 tutorial_paused = False
-                continue
+                move_dir = 0
 
             if player is not None and player.state == DEAD:
                 if hasattr(player, 'dead_time') and player.dead_time >= RESTART_DELAY:
@@ -118,9 +128,8 @@ def handle_events(events):
             elif e.key == SDLK_UP:
                 if can_enter_next:
                     game_framework.change_state(stage1_mode)
+
         elif e.type == SDL_KEYUP:
-            if player is not None and player.state == DEAD:
-                continue
             if e.key == SDLK_LEFT:
                 move_dir += 1
             elif e.key == SDLK_RIGHT:
@@ -139,6 +148,7 @@ def _enemy_dead():
 
 def update(dt):
     global can_enter_next, effects, death_count, last_player_state, tutorial_paused
+    global player_attack_active_prev, enemy_damaged_this_attack
     if tutorial_paused:
         return
 
@@ -152,22 +162,28 @@ def update(dt):
 
     player.update(dt, move_dir)
 
+    attack_active = hasattr(player, 'is_attacking_active') and player.is_attacking_active()
+    if attack_active and not player_attack_active_prev:
+        enemy_damaged_this_attack = False
+
     if enemy:
         if hasattr(enemy, 'is_alive') and enemy.is_alive():
-            if hasattr(player, 'is_attacking_active') and player.is_attacking_active():
+            if attack_active:
                 l1, b1, r1, t1 = player.attack_hitbox()
                 l2, b2, r2, t2 = enemy.aabb()
                 if rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
-                    enemy.die()
-                    ex = (l2 + r2) * 0.5
-                    ey = (b2 + t2) * 0.5
-                    dir = player.dir if hasattr(player, 'dir') else 1
-                    effects.append(KillSlashEffect(stage, ex, ey, dir, scale=1.0))
+                    if not enemy_damaged_this_attack:
+                        enemy.take_damage()
+                        enemy_damaged_this_attack = True
+                        ex = (l2 + r2) * 0.5
+                        ey = (b2 + t2) * 0.5
+                        dir = player.dir if hasattr(player, 'dir') else 1
+                        effects.append(KillSlashEffect(stage, ex, ey, dir, scale=1.0))
         enemy.update(dt)
 
     for eff in effects:
         eff.update(dt)
-    effects = [e for e in effects if e.is_alive()]
+    effects[:] = [e for e in effects if e.is_alive()]
 
     stage.update(dt, player.x)
     near_stairs = (player.x <= TRIGGER_X_MAX) and abs(player.y - stage.ground_y) < 8
@@ -177,12 +193,30 @@ def update(dt):
         death_count += 1
 
     last_player_state = player.state
+    player_attack_active_prev = attack_active
+
 
 def draw():
     clear_canvas()
     stage.draw()
     if enemy:
         enemy.draw()
+
+        if boss_hp_font is not None and hasattr(enemy, 'hp') and hasattr(enemy, 'is_alive') and enemy.is_alive():
+            sx, sy = stage.to_screen(enemy.x, enemy.y)
+            current_hp = max(enemy.hp, 0)
+            text = f'HP: {current_hp}/{enemy.max_hp}'
+            box_w = int(len(text) * 14)
+            box_h = 32
+            box_x = sx
+            box_y = sy + 10
+            left = box_x - box_w // 2
+            right = box_x + box_w // 2
+            bottom = box_y - box_h // 2
+            top = box_y + box_h // 2
+            draw_rectangle(left, bottom, right, top)
+            boss_hp_font.draw(left + 10, box_y - 10, text, (255, 0, 0))
+
     for eff in effects:
         eff.draw()
     player.draw()
@@ -198,14 +232,15 @@ def draw():
             cx = w // 2
             cy = h // 2
             box_w = int(w * 0.7)
-            box_h = 90
+            box_h = 110
             left = cx - box_w // 2
             right = cx + box_w // 2
             bottom = cy - box_h // 2
             top = cy + box_h // 2
             draw_rectangle(left, bottom, right, top)
-            hint_font.draw(left + 20, cy + 15, '보스의 공격은 엇박자입니다.', (255, 255, 255))
-            hint_font.draw(left + 20, cy - 15, '아무 키를 눌러 계속', (255, 255, 255))
+            hint_font.draw(left + 100, cy + 390, '보스를 공격해도 그의 공격은 끊기지 않습니다.', (255, 255, 255))
+            hint_font.draw(left + 100, cy + 360, '타이밍을 잘 잡으세요.', (255, 255, 255))
+            hint_font.draw(left + 100, cy + 330, '아무 키를 눌러 계속', (255, 255, 0))
 
     if player is not None and hasattr(player, 'dead_time') and player.state == DEAD:
         if game_over_font is not None and player.dead_time >= GAME_OVER_DELAY:
@@ -232,20 +267,30 @@ def draw():
 
             if hint_font is not None and death_count > 0:
                 box_w = int(w * 0.7)
-                box_h = 80
+                box_h = 100
                 left = cx - box_w // 2
                 right = cx + box_w // 2
                 bottom = restart_y + RESTART_FONT_SIZE + 10
                 top = bottom + box_h
                 draw_rectangle(left, bottom, right, top)
-                if death_count == 1:
-                    msg = '구르기를 남발한다고 계속 살 수는 없습니다.'
-                elif death_count == 2:
-                    msg = '보스의 순간적인 공격에는 쿨타임이 존재합니다.'
+
+                phase = death_count % 4
+                if phase == 1:
+                    msg1 = '보스의 공격은 엇박자로 이루어집니다.'
+                    msg2 = '구르기를 남발해도 계속 살 수 없습니다.'
+                elif phase == 2:
+                    msg1 = '보스의 순간이동 공격은 쿨타임이 존재합니다.'
+                    msg2 = '또한 보스의 준비 자세를 잘 보세요'
+                elif phase == 3:
+                    msg1 = '라이프는 무한합니다.'
+                    msg2 = '보스의 HP도 연속적입니다.'
                 else:
-                    msg = '라이프는 무한합니다.'
-                text_x = left + 20
-                text_y = bottom + box_h // 2
-                hint_font.draw(text_x, text_y, msg, (255, 255, 255))
+                    msg1 = '보스를 공격해도 그의 공격은 끊기지 않습니다.'
+                    msg2 = '타이밍을 잘 잡으세요.'
+
+                text_x = left + 200
+                center_y = bottom + 400
+                hint_font.draw(text_x, center_y + 10, msg1, (255, 255, 255))
+                hint_font.draw(text_x, center_y - 20, msg2, (255, 255, 255))
 
     update_canvas()

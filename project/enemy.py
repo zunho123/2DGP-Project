@@ -59,6 +59,8 @@ class Enemy:
         self.on_ground = True
 
         self.state = EN_RUN
+        self.max_hp = 20
+        self.hp = self.max_hp
 
         self.frame = 0
         self.tacc = 0.0
@@ -185,10 +187,19 @@ class Enemy:
 
     def handle_collision(self, group, other, hit):
         if group == 'player:enemy' and hit:
-            self.die()
+            self.take_damage()
 
     def is_alive(self):
         return self.state != EN_DEAD
+
+    def take_damage(self, amount=1):
+        if self.state == EN_DEAD:
+            return
+        if self.special_recovery > 0.0:
+            amount *= 2
+        self.hp -= amount
+        if self.hp <= 0:
+            self.die()
 
     def die(self):
         if self.state != EN_DEAD:
@@ -425,7 +436,7 @@ class Enemy:
                     self.special_tacc = 0.0
                     self.attack_timer = self.attack_cooldown
                     self.stop_run()
-                    self.special_recovery = 1.0
+                    self.special_recovery = 1.5
 
     def draw(self):
         flip = (self.dir == -1)
