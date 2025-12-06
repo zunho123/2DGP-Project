@@ -27,6 +27,13 @@ RESTART_DELAY = 3.0
 GAME_OVER_FONT_SIZE = 72
 RESTART_FONT_SIZE = 36
 
+SLOWMO_DURATION = 1.0
+SLOWMO_SCALE = 0.25
+
+game_over_font = None
+restart_font = None
+slowmo_time = 0.0
+
 game_over_font = None
 restart_font = None
 
@@ -40,6 +47,7 @@ def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next, bgm, effects
     global game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font, warning_img
     global player_attack_active_prev, enemy_damaged_this_attack
+    global slowmo_time
     stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
@@ -60,11 +68,12 @@ def enter():
     last_player_state = player.state
     player_attack_active_prev = False
     enemy_damaged_this_attack = False
-
+    slowmo_time = 0.0
 
 def exit():
     global bgm, game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font, boss_hp_font, warning_img
     global player_attack_active_prev, enemy_damaged_this_attack
+    global slowmo_time
     if bgm is not None:
         bgm.stop()
     bgm = None
@@ -78,6 +87,7 @@ def exit():
     player_attack_active_prev = False
     enemy_damaged_this_attack = False
     warning_img = None
+    slowmo_time = 0.0
 
 def restart_play():
     global move_dir, last_player_state, player_attack_active_prev, enemy_damaged_this_attack
@@ -152,6 +162,7 @@ def _enemy_dead():
 def update(dt):
     global can_enter_next, effects, death_count, last_player_state, tutorial_paused
     global player_attack_active_prev, enemy_damaged_this_attack
+    global slowmo_time
     if tutorial_paused:
         return
 
@@ -161,9 +172,16 @@ def update(dt):
     if last_player_state is None:
         last_player_state = player.state
 
+    local_dt = dt
+    if slowmo_time > 0.0:
+        slowmo_time -= dt
+        if slowmo_time < 0.0:
+            slowmo_time = 0.0
+        local_dt = dt * SLOWMO_SCALE
+
     prev_state = last_player_state
 
-    player.update(dt, move_dir)
+    player.update(local_dt, move_dir)
 
     attack_active = hasattr(player, 'is_attacking_active') and player.is_attacking_active()
     if attack_active and not player_attack_active_prev:
@@ -184,16 +202,18 @@ def update(dt):
                         ey = (b2 + t2) * 0.5
                         dir = player.dir if hasattr(player, 'dir') else 1
                         if was_alive and (enemy.hp <= 0 or not enemy.is_alive()):
+                            slowmo_time = SLOWMO_DURATION
                             effects.append(KillSlashEffect(stage, ex, ey, dir, scale=1.0))
                         else:
                             effects.append(BloodEffect(stage, ex, ey, scale=0.1))
-        enemy.update(dt)
+        enemy.update(local_dt)
 
     for eff in effects:
-        eff.update(dt)
+        eff.update(local_dt)
     effects[:] = [e for e in effects if e.is_alive()]
 
-    stage.update(dt, player.x)
+    stage.update(local_dt, player.x)
+
     near_stairs = (player.x <= TRIGGER_X_MAX) and abs(player.y - stage.ground_y) < 8
     can_enter_next = _enemy_dead() and near_stairs
 
