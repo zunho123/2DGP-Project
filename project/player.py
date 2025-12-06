@@ -95,6 +95,7 @@ class Player:
         self.hit_flash_timer = 0.0
         self.last_hit_by_enemy = None
         self.stage.player = self
+        self.dead_time = -1.0
 
     def request_jump(self):
         if self.state in (DEAD, STAND):
@@ -163,6 +164,7 @@ class Player:
         self.vy = 0.0
         self.invincible = False
         self.slash_playing = False
+        self.dead_time = 0.0
 
     def start_stand(self):
         self.state = STAND
@@ -171,10 +173,13 @@ class Player:
         self.vy = 0.0
         self.invincible = False
         self.slash_playing = False
+        self.dead_time = -1.0
 
     def update(self, dt, move_dir=0):
         if self.state == DEAD:
             self.stage.apply_physics(self, dt, 0)
+            if self.dead_time >= 0.0:
+                self.dead_time += dt
             if self.hit_flash_timer > 0.0:
                 self.hit_flash_timer -= dt
                 if self.hit_flash_timer < 0.0:
