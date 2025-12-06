@@ -246,6 +246,8 @@ class Enemy:
         player = getattr(self.stage, 'player', None)
         if player is None:
             return
+        if not player.is_vulnerable():
+            return
         atk_l, atk_b, atk_r, atk_t = self.attack_hitbox()
         pl_l, pl_b, pl_r, pl_t = player.get_bb()
         if atk_l > pl_r:
@@ -259,6 +261,9 @@ class Enemy:
         self.hit_this_swing = True
         self.hit_flash_timer = 0.2
         setattr(player, 'last_hit_by_enemy', self)
+        player.hit_flash_timer = 0.2
+        if hasattr(player, 'die'):
+            player.die()
 
     def check_special_hit(self):
         player = getattr(self.stage, 'player', None)
@@ -268,6 +273,9 @@ class Enemy:
             return
         setattr(player, 'last_hit_by_enemy', self)
         player.hit_flash_timer = 0.2
+        if hasattr(player, 'die'):
+            player.die()
+
 
     def stop_run(self):
         if self.state != EN_DEAD:
