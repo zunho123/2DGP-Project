@@ -2,7 +2,7 @@ from pico2d import *
 import game_framework
 import stage1_mode
 from stage import Stage
-from player import Player
+from player import Player, DEAD
 from enemy import Enemy
 from kill_effect import KillSlashEffect
 
@@ -18,6 +18,14 @@ effects = []
 TRIGGER_X_MAX = 120
 PROMPT_SIZE = 56
 PLAYER_SCALE_STAGE1 = 1.0
+GAME_OVER_DELAY = 1.0
+RESTART_DELAY = 3.0
+GAME_OVER_FONT_SIZE = 72
+RESTART_FONT_SIZE = 36
+
+game_over_font = None
+restart_font = None
+
 
 
 def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
@@ -26,6 +34,7 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next, bgm, effects
+    global game_over_font, restart_font
     stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
@@ -36,13 +45,29 @@ def enter():
     bgm = load_music('song_boss1.ogg')
     bgm.set_volume(64)
     bgm.repeat_play()
+    game_over_font = load_font('neodgm.ttf', GAME_OVER_FONT_SIZE)
+    restart_font = load_font('neodgm.ttf', RESTART_FONT_SIZE)
 
 
 def exit():
-    global bgm
+    global bgm, game_over_font, restart_font
     if bgm is not None:
         bgm.stop()
     bgm = None
+    game_over_font = None
+    restart_font = None
+
+
+def restart_play():
+    global move_dir
+    if player is None or stage is None:
+        return
+    player.start_stand()
+    player.y = stage.ground_y + player.ground_off + 2
+    player.vy = 0.0
+    player.on_ground = True
+    player.hit_flash_timer = 0.0
+    move_dir = 0
 
 
 def handle_events(events):
@@ -53,7 +78,14 @@ def handle_events(events):
         elif e.type == SDL_KEYDOWN:
             if e.key == SDLK_ESCAPE:
                 game_framework.quit()
-            elif e.key == SDLK_LEFT:
+
+            if player is not None and player.state == DEAD:
+                if hasattr(player, 'dead_time') and player.dead_time >= RESTART_DELAY:
+                    if e.key == SDLK_r:
+                        restart_play()
+                continue
+
+            if e.key == SDLK_LEFT:
                 move_dir -= 1
             elif e.key == SDLK_RIGHT:
                 move_dir += 1
@@ -67,11 +99,12 @@ def handle_events(events):
                 if can_enter_next:
                     game_framework.change_state(stage1_mode)
         elif e.type == SDL_KEYUP:
+            if player is not None and player.state == DEAD:
+                continue
             if e.key == SDLK_LEFT:
                 move_dir += 1
             elif e.key == SDLK_RIGHT:
                 move_dir -= 1
-
 
 def _enemy_dead():
     if enemy is None:
@@ -120,4 +153,27 @@ def draw():
     if can_enter_next and up_hint is not None:
         sx, sy = stage.to_screen(player.x, player.y)
         up_hint.draw(sx, sy + int(80 * stage.zoom), PROMPT_SIZE, PROMPT_SIZE)
+
+    if player is not None and hasattr(player, 'dead_time') and player.state == DEAD:
+        if game_over_font is not None and player.dead_time >= GAME_OVER_DELAY:
+            w = get_canvas_width()
+            h = get_canvas_height()
+            cx = w // 2
+            cy = h // 2
+            text = "GAME OVER"
+            approx_half = len(text) * GAME_OVER_FONT_SIZE * 0.3
+            game_over_font.draw(cx - approx_half,
+                                cy,
+                                text)
+        if restart_font is not None and player.dead_time >= RESTART_DELAY:
+            w = get_canvas_width()
+            h = get_canvas_height()
+            cx = w // 2
+            cy = h // 2
+            text2 = "RESTART? : R/r"
+            approx_half2 = len(text2) * RESTART_FONT_SIZE * 0.3
+            restart_font.draw(cx - approx_half2,
+                              cy - RESTART_FONT_SIZE,
+                              text2)
+
     update_canvas()

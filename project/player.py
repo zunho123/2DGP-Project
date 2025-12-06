@@ -314,11 +314,11 @@ class Player:
 
         elif self.state == DEAD:
             self.stage.draw_frame(self.img_dead, self.data_dead, self.dead_frame,
-                                  self.x, self.y, self.char_scale, flip)
+                                  self.x, self.y + 2, self.char_scale, flip)
 
         elif self.state == STAND:
             self.stage.draw_frame(self.img_stand, self.data_stand, self.stand_frame,
-                                  self.x, self.y, self.char_scale, flip)
+                                  self.x, self.y + 7.5, self.char_scale, flip)
 
         else:
             self.stage.draw_frame(self.img_attack, self.data_attack, self.atk_frame,
