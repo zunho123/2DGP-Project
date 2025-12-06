@@ -114,3 +114,4 @@ class Stage:
             img.clip_composite_draw(l_src, 0, w_src, h, 0, 'h', sx, sy + dh // 2, dw, dh)
         else:
             img.clip_draw(l_src, 0, w_src, h, sx, sy + dh // 2, dw, dh)
+
