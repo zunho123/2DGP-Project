@@ -22,6 +22,7 @@ tutorial_step = 0
 stage_clear = False
 stage_clear_time = 0.0
 stage_clear_font = None
+bgm = None
 
 PLAYER_SCALE_STAGE0 = 1.5
 FIRST_FLOOR_GROUND = -12.5
@@ -44,7 +45,7 @@ STAGE_CLEAR_FONT_SIZE = 72
 def enter():
     global stage, player, move_dir, left_pressed, right_pressed
     global up_hint, can_use_elevator, enemies, elevator_used, paused, hint_font, tutorial_step
-    global stage_clear, stage_clear_time, stage_clear_font
+    global stage_clear, stage_clear_time, stage_clear_font, bgm
 
     w = get_canvas_width()
     h = get_canvas_height()
@@ -80,6 +81,10 @@ def enter():
     stage_clear_time = 0.0
     stage_clear_font = load_font('neodgm.ttf', STAGE_CLEAR_FONT_SIZE)
 
+    bgm = load_music('song_neon.mp3')
+    bgm.set_volume(64)
+    bgm.repeat_play()
+
 
 def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
     return not (r1 < l2 or r2 < l1 or t1 < b2 or t2 < b1)
@@ -88,7 +93,7 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 def exit():
     global stage, player, up_hint, enemies, can_use_elevator, elevator_used
     global hint_font, paused, tutorial_step
-    global stage_clear, stage_clear_time, stage_clear_font
+    global stage_clear, stage_clear_time, stage_clear_font, bgm
 
     stage = None
     player = None
@@ -103,6 +108,10 @@ def exit():
     stage_clear = False
     stage_clear_time = 0.0
     stage_clear_font = None
+
+    if bgm is not None:
+        bgm.stop()
+    bgm = None
 
 
 def handle_events(events):
