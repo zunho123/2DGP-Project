@@ -347,7 +347,7 @@ class Enemy:
         if self.state != EN_DEAD:
             self.special_timer += dt
 
-        if self.special_recovery > 0.0:
+        if self.special_recovery > 0.0 and self.state != EN_DEAD:
             self.special_recovery -= dt
             if self.special_recovery < 0:
                 self.special_recovery = 0

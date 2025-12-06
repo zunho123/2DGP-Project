@@ -5,6 +5,7 @@ from stage import Stage
 from player import Player, DEAD
 from enemy import Enemy, EN_SPECIAL
 from kill_effect import KillSlashEffect
+from blood_effect import BloodEffect
 
 stage = None
 player = None
@@ -175,12 +176,17 @@ def update(dt):
                 l2, b2, r2, t2 = enemy.aabb()
                 if rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
                     if not enemy_damaged_this_attack:
+                        prev_hp = enemy.hp
+                        was_alive = enemy.is_alive()
                         enemy.take_damage()
                         enemy_damaged_this_attack = True
                         ex = (l2 + r2) * 0.5
                         ey = (b2 + t2) * 0.5
                         dir = player.dir if hasattr(player, 'dir') else 1
-                        effects.append(KillSlashEffect(stage, ex, ey, dir, scale=1.0))
+                        if was_alive and (enemy.hp <= 0 or not enemy.is_alive()):
+                            effects.append(KillSlashEffect(stage, ex, ey, dir, scale=1.0))
+                        else:
+                            effects.append(BloodEffect(stage, ex, ey, scale=0.1))
         enemy.update(dt)
 
     for eff in effects:
