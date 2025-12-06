@@ -35,7 +35,7 @@ def rect_overlap(l1, b1, r1, t1, l2, b2, r2, t2):
 
 def enter():
     global stage, player, enemy, up_hint, move_dir, can_enter_next, bgm, effects
-    global game_over_font, restart_font, hint_font
+    global game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font
     stage = Stage('stage1.png', window_w=1920, window_h=1080, zoom=4.0, ground_px=15)
     player = Player(stage, scale=PLAYER_SCALE_STAGE1)
     enemy = Enemy(stage)
@@ -48,28 +48,28 @@ def enter():
     bgm.repeat_play()
     game_over_font = load_font('neodgm.ttf', GAME_OVER_FONT_SIZE)
     restart_font = load_font('neodgm.ttf', RESTART_FONT_SIZE)
-    hint_font = load_font('neodgm.ttf', 20)
+    hint_font = load_font('neodgm.ttf', 24)
+    death_count = 0
+    tutorial_paused = True
+    last_player_state = player.state
+
 
 
 def exit():
-    global stage, player, enemy, up_hint, bgm, effects
-    global game_over_font, restart_font, hint_font
-
+    global bgm, game_over_font, restart_font, death_count, tutorial_paused, last_player_state, hint_font
     if bgm is not None:
         bgm.stop()
-    stage = None
-    player = None
-    enemy = None
-    up_hint = None
     bgm = None
-    effects = []
     game_over_font = None
     restart_font = None
     hint_font = None
+    death_count = 0
+    tutorial_paused = False
+    last_player_state = None
 
 
 def restart_play():
-    global move_dir
+    global move_dir, last_player_state
     if player is None or stage is None:
         return
     player.start_stand()
@@ -78,19 +78,26 @@ def restart_play():
     player.on_ground = True
     player.hit_flash_timer = 0.0
     move_dir = 0
+    last_player_state = player.state
 
 
 def handle_events(events):
-    global move_dir, can_enter_next
+    global move_dir, can_enter_next, tutorial_paused
     for e in events:
         if e.type == SDL_QUIT:
             game_framework.quit()
         elif e.type == SDL_KEYDOWN:
             if e.key == SDLK_ESCAPE:
                 game_framework.quit()
+                continue
             elif e.key == SDLK_q:
-                game_framework.change_to_loading()
-                return
+                if hasattr(game_framework, 'change_to_loading'):
+                    game_framework.change_to_loading()
+                continue
+
+            if tutorial_paused:
+                tutorial_paused = False
+                continue
 
             if player is not None and player.state == DEAD:
                 if hasattr(player, 'dead_time') and player.dead_time >= RESTART_DELAY:
@@ -131,7 +138,18 @@ def _enemy_dead():
 
 
 def update(dt):
-    global can_enter_next, effects
+    global can_enter_next, effects, death_count, last_player_state, tutorial_paused
+    if tutorial_paused:
+        return
+
+    if player is None:
+        return
+
+    if last_player_state is None:
+        last_player_state = player.state
+
+    prev_state = last_player_state
+
     player.update(dt, move_dir)
 
     if enemy:
@@ -155,6 +173,10 @@ def update(dt):
     near_stairs = (player.x <= TRIGGER_X_MAX) and abs(player.y - stage.ground_y) < 8
     can_enter_next = _enemy_dead() and near_stairs
 
+    if prev_state != DEAD and player.state == DEAD:
+        death_count += 1
+
+    last_player_state = player.state
 
 def draw():
     clear_canvas()
@@ -172,6 +194,18 @@ def draw():
         w = get_canvas_width()
         h = get_canvas_height()
         hint_font.draw(10, h - 30, 'q : 로딩 화면 전환', (255, 255, 255))
+        if tutorial_paused:
+            cx = w // 2
+            cy = h // 2
+            box_w = int(w * 0.7)
+            box_h = 90
+            left = cx - box_w // 2
+            right = cx + box_w // 2
+            bottom = cy - box_h // 2
+            top = cy + box_h // 2
+            draw_rectangle(left, bottom, right, top)
+            hint_font.draw(left + 20, cy + 15, '보스의 공격은 엇박자입니다.', (255, 255, 255))
+            hint_font.draw(left + 20, cy - 15, '아무 키를 눌러 계속', (255, 255, 255))
 
     if player is not None and hasattr(player, 'dead_time') and player.state == DEAD:
         if game_over_font is not None and player.dead_time >= GAME_OVER_DELAY:
@@ -191,9 +225,27 @@ def draw():
             cy = h // 2
             text2 = "RESTART? : R/r"
             approx_half2 = len(text2) * RESTART_FONT_SIZE * 0.3
+            restart_y = cy - RESTART_FONT_SIZE
             restart_font.draw(cx - approx_half2,
-                              cy - RESTART_FONT_SIZE,
+                              restart_y,
                               text2)
 
-    update_canvas()
+            if hint_font is not None and death_count > 0:
+                box_w = int(w * 0.7)
+                box_h = 80
+                left = cx - box_w // 2
+                right = cx + box_w // 2
+                bottom = restart_y + RESTART_FONT_SIZE + 10
+                top = bottom + box_h
+                draw_rectangle(left, bottom, right, top)
+                if death_count == 1:
+                    msg = '구르기를 남발한다고 계속 살 수는 없습니다.'
+                elif death_count == 2:
+                    msg = '보스의 순간적인 공격에는 쿨타임이 존재합니다.'
+                else:
+                    msg = '라이프는 무한합니다.'
+                text_x = left + 20
+                text_y = bottom + box_h // 2
+                hint_font.draw(text_x, text_y, msg, (255, 255, 255))
 
+    update_canvas()
